@@ -1,0 +1,23 @@
+# Terraform: carpeta de trabajo y estado (el estado puede contener contraseñas)
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Variables con secretos: solo se sube el ejemplo
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Claves y otros secretos
+*.pem
+*.key
+id_*
+.env
+
+# Imágenes de disco e ISO: pesan demasiado para git
+*.iso
+*.qcow2
+*.vdi
+*.img

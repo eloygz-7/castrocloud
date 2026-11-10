@@ -1,0 +1,13 @@
+# Copiar como terraform.tfvars e pór o token real.
+# terraform.tfvars está en .gitignore: o token NON se sube a git.
+proxmox_api_token = "terraform@pve!provider=00000000-0000-0000-0000-000000000000"
+
+# Por defecto úsase a wifi da casa (192.168.0.0/24). Se a demo vai noutra wifi
+# (por exemplo, o punto de acceso do móbil), descomentar e cambiar as IP:
+# proxmox_endpoint = "https://192.168.43.211:8006/"
+# pasarela         = "192.168.43.1"
+# contedores = {
+#   pve1 = { vm_id = 201, ip = "192.168.43.221" }
+#   pve2 = { vm_id = 202, ip = "192.168.43.222" }
+#   pve3 = { vm_id = 203, ip = "192.168.43.223" }
+# }
