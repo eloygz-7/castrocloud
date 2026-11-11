@@ -27,8 +27,8 @@ function Executar { & $VBox @args; if ($LASTEXITCODE -ne 0) { throw "Fallou: VBo
 if (-not (Test-Path $VBox)) { throw "Non se atopa VBoxManage.exe (está instalado VirtualBox?)" }
 if (-not (Test-Path $Iso)) { throw "Non se atopa a ISO: $Iso" }
 
-& $VBox showvminfo $Nome *> $null
-if ($LASTEXITCODE -eq 0) { throw "Xa existe unha MV chamada '$Nome'" }
+# Compróbase coa lista de MV (showvminfo con redirección dá un código de saída falso en PowerShell 5.1)
+if (& $VBox list vms | Select-String -SimpleMatch "`"$Nome`"") { throw "Xa existe unha MV chamada '$Nome'" }
 
 $Ponte = (& $VBox list bridgedifs | Select-String "^Name:\s+(.+)$" | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() })
 if ($Ponte -notcontains $Adaptador) {
