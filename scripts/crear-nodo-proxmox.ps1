@@ -6,13 +6,16 @@
 # -Adaptador: nome da tarxeta wifi (ou de cable) tal e como o mostra
 #   & "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" list bridgedifs   (liña "Name:")
 #
-# Se Windows ten Hyper-V ou a «integridade da memoria» activada, VirtualBox non
-# permite a virtualización aniñada: a MV arranca igual e os contedores LXC
-# funcionan, pero Proxmox non poderá crear máquinas virtuais KVM nese nodo.
+# Valores pensados para un portátil con poucos recursos: 4 GB de RAM, sen
+# virtualización aniñada (a demo usa contedores LXC, que non a precisan) e con
+# caché de E/S do anfitrión no disco. Con 6 GB e virtualización aniñada, a
+# instalación de Proxmox paraba cun «Guru Meditation» no 69 %.
+# Se Windows ten Hyper-V ou a «integridade da memoria» activada, VirtualBox vai
+# máis lento e menos estable: convén desactivalos (bcdedit /set hypervisorlaunchtype off).
 
 param(
     [string]$Nome = "pve2",
-    [int]$RamMB = 6144,
+    [int]$RamMB = 4096,
     [int]$Cpus = 2,
     [int]$DiscoGB = 32,
     [Parameter(Mandatory = $true)][string]$Iso,
@@ -52,13 +55,9 @@ Executar createvm --name $Nome --ostype Debian_64 --groups /CastroCloud --regist
 Executar modifyvm $Nome --memory $RamMB --cpus $Cpus --ioapic on `
     --firmware bios --rtc-use-utc on --graphicscontroller vmsvga --vram 32 `
     --nic1 bridged --bridge-adapter1 $Adaptador --nictype1 82540EM --nic-promisc1 allow-all `
-    --boot1 disk --boot2 dvd --boot3 none --boot4 none
+    --boot1 disk --boot2 dvd --boot3 none --boot4 none --nested-hw-virt off
 
-# A virtualización aniñada falla se Windows usa Hyper-V: avísase e séguese sen ela
-& $VBox modifyvm $Nome --nested-hw-virt on
-if ($LASTEXITCODE -ne 0) { Write-Warning "Sen virtualización aniñada: só funcionarán contedores LXC neste nodo" }
-
-Executar storagectl $Nome --name SATA --add sata --controller IntelAhci --portcount 2
+Executar storagectl $Nome --name SATA --add sata --controller IntelAhci --portcount 2 --hostiocache on
 Executar createmedium disk --filename $Disco --size ($DiscoGB * 1024) --format VDI
 Executar storageattach $Nome --storagectl SATA --port 0 --device 0 --type hdd --medium $Disco
 Executar storageattach $Nome --storagectl SATA --port 1 --device 0 --type dvddrive --medium $Iso
