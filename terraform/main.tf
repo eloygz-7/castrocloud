@@ -12,6 +12,8 @@ resource "proxmox_download_file" "plantilla_debian" {
   url                = var.plantilla_lxc.url
   checksum           = var.plantilla_lxc.sha512
   checksum_algorithm = "sha512"
+  # O nodo de Windows (pve2) baixa máis lento pola wifi: os 10 min por defecto non chegan
+  upload_timeout = 3600
 }
 
 # 2. Contrasinal aleatorio para o usuario root dos contedores
