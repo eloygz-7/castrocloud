@@ -1,11 +1,13 @@
-# Demostración: un contedor LXC en cada nodo do clúster.
+# Demostración: 8 contedores LXC lixeiros repartidos polo clúster
+# (3 en pve1, 2 en pve2, que é o PC con Windows e ten menos recursos, e 3 en pve3).
 # Os contedores LXC non necesitan virtualización aniñada, así que funcionan
 # tamén no nodo de Windows.
 
 # 1. Descargar a plantilla de Alpine Linux en cada nodo (3,5 MB fronte aos 130 MB de Debian:
-#    o PC con Windows (pve2) ten poucos recursos e baixa lento pola wifi) (o almacenamento "local" é propio de cada nodo)
+#    o PC con Windows (pve2) ten poucos recursos e baixa lento pola wifi).
+#    Descárgase unha vez por nodo, porque o almacenamento "local" é propio de cada nodo.
 resource "proxmox_download_file" "plantilla_lxc" {
-  for_each = var.contedores
+  for_each = toset([for ct in var.contedores : ct.nodo])
 
   node_name          = each.key
   datastore_id       = "local"
@@ -27,7 +29,7 @@ resource "random_password" "root" {
 resource "proxmox_virtual_environment_container" "demo" {
   for_each = var.contedores
 
-  node_name   = each.key
+  node_name   = each.value.nodo
   vm_id       = each.value.vm_id
   description = "CastroCloud: contedor de demostración creado con Terraform"
   tags        = ["castrocloud", "terraform"]
@@ -43,12 +45,13 @@ resource "proxmox_virtual_environment_container" "demo" {
   }
 
   memory {
-    dedicated = 256
+    dedicated = 128
+    swap      = 0
   }
 
   disk {
     datastore_id = var.almacen_discos
-    size         = 2
+    size         = 1
   }
 
   network_interface {
@@ -57,12 +60,12 @@ resource "proxmox_virtual_environment_container" "demo" {
   }
 
   operating_system {
-    template_file_id = proxmox_download_file.plantilla_lxc[each.key].id
+    template_file_id = proxmox_download_file.plantilla_lxc[each.value.nodo].id
     type             = "alpine"
   }
 
   initialization {
-    hostname = "ct-demo-${each.key}"
+    hostname = each.key
 
     ip_config {
       ipv4 {

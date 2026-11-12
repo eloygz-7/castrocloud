@@ -11,15 +11,21 @@ variable "proxmox_api_token" {
 }
 
 variable "contedores" {
-  description = "Un contedor de demostración por nodo: nome do nodo => ID e IP"
+  description = "Contedores de demostración: nome => nodo, ID e IP (3 en pve1, 2 en pve2 e 3 en pve3)"
   type = map(object({
+    nodo  = string
     vm_id = number
     ip    = string
   }))
   default = {
-    pve1 = { vm_id = 201, ip = "192.168.0.221" }
-    pve2 = { vm_id = 202, ip = "192.168.0.222" }
-    pve3 = { vm_id = 203, ip = "192.168.0.223" }
+    ct-pve1-1 = { nodo = "pve1", vm_id = 201, ip = "192.168.0.221" }
+    ct-pve1-2 = { nodo = "pve1", vm_id = 202, ip = "192.168.0.222" }
+    ct-pve1-3 = { nodo = "pve1", vm_id = 203, ip = "192.168.0.223" }
+    ct-pve2-1 = { nodo = "pve2", vm_id = 204, ip = "192.168.0.224" }
+    ct-pve2-2 = { nodo = "pve2", vm_id = 205, ip = "192.168.0.225" }
+    ct-pve3-1 = { nodo = "pve3", vm_id = 206, ip = "192.168.0.226" }
+    ct-pve3-2 = { nodo = "pve3", vm_id = 207, ip = "192.168.0.227" }
+    ct-pve3-3 = { nodo = "pve3", vm_id = 208, ip = "192.168.0.228" }
   }
 }
 

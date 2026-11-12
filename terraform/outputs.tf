@@ -1,6 +1,6 @@
 output "contedores" {
-  description = "Contedores creados: nodo => IP"
-  value       = { for nodo, ct in var.contedores : "ct-demo-${nodo}" => ct.ip }
+  description = "Contedores creados: nome => nodo e IP"
+  value       = { for nome, ct in var.contedores : nome => "${ct.nodo} ${ct.ip}" }
 }
 
 output "contrasinal_root" {

@@ -7,7 +7,12 @@ proxmox_api_token = "terraform@pve!provider=00000000-0000-0000-0000-000000000000
 # proxmox_endpoint = "https://192.168.43.211:8006/"
 # pasarela         = "192.168.43.1"
 # contedores = {
-#   pve1 = { vm_id = 201, ip = "192.168.43.221" }
-#   pve2 = { vm_id = 202, ip = "192.168.43.222" }
-#   pve3 = { vm_id = 203, ip = "192.168.43.223" }
+#   ct-pve1-1 = { nodo = "pve1", vm_id = 201, ip = "192.168.43.221" }
+#   ct-pve1-2 = { nodo = "pve1", vm_id = 202, ip = "192.168.43.222" }
+#   ct-pve1-3 = { nodo = "pve1", vm_id = 203, ip = "192.168.43.223" }
+#   ct-pve2-1 = { nodo = "pve2", vm_id = 204, ip = "192.168.43.224" }
+#   ct-pve2-2 = { nodo = "pve2", vm_id = 205, ip = "192.168.43.225" }
+#   ct-pve3-1 = { nodo = "pve3", vm_id = 206, ip = "192.168.43.226" }
+#   ct-pve3-2 = { nodo = "pve3", vm_id = 207, ip = "192.168.43.227" }
+#   ct-pve3-3 = { nodo = "pve3", vm_id = 208, ip = "192.168.43.228" }
 # }
