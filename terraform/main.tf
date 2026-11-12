@@ -2,8 +2,9 @@
 # Os contedores LXC non necesitan virtualización aniñada, así que funcionan
 # tamén no nodo de Windows.
 
-# 1. Descargar a plantilla de Debian 13 en cada nodo (o almacenamento "local" é propio de cada nodo)
-resource "proxmox_download_file" "plantilla_debian" {
+# 1. Descargar a plantilla de Alpine Linux en cada nodo (3,5 MB fronte aos 130 MB de Debian:
+#    o PC con Windows (pve2) ten poucos recursos e baixa lento pola wifi) (o almacenamento "local" é propio de cada nodo)
+resource "proxmox_download_file" "plantilla_lxc" {
   for_each = var.contedores
 
   node_name          = each.key
@@ -42,12 +43,12 @@ resource "proxmox_virtual_environment_container" "demo" {
   }
 
   memory {
-    dedicated = 512
+    dedicated = 256
   }
 
   disk {
     datastore_id = var.almacen_discos
-    size         = 4
+    size         = 2
   }
 
   network_interface {
@@ -56,8 +57,8 @@ resource "proxmox_virtual_environment_container" "demo" {
   }
 
   operating_system {
-    template_file_id = proxmox_download_file.plantilla_debian[each.key].id
-    type             = "debian"
+    template_file_id = proxmox_download_file.plantilla_lxc[each.key].id
+    type             = "alpine"
   }
 
   initialization {

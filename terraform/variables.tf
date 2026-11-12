@@ -42,13 +42,13 @@ variable "almacen_discos" {
 }
 
 variable "plantilla_lxc" {
-  description = "Plantilla oficial de Proxmox para os contedores LXC (Debian 13)"
+  description = "Plantilla oficial de Proxmox para os contedores LXC (Alpine Linux 3.24, lixeira para o nodo de Windows)"
   type = object({
     url    = string
     sha512 = string
   })
   default = {
-    url    = "http://download.proxmox.com/images/system/debian-13-standard_13.6-1_amd64.tar.zst"
-    sha512 = "4c0c27ca6ceab5ef0b84db57825a00f26157ef1854bafe97297813e1cbe8ecb8cc9c453cab6b3b0efe1ba193a50c47ece1e41d950e411b8730b835b71e9e754b"
+    url    = "http://download.proxmox.com/images/system/alpine-3.24-default_20261105_amd64.tar.xz"
+    sha512 = "5f2ab800b1cf9b9eed768b0cd4b4c395d5bc00a7eda7a185c89111067a25e7ce28d86ffb6d1b3f3181d43d9935e708c713f6b3937f39a5f2839cb56214889c8b"
   }
 }
