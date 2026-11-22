@@ -2,8 +2,9 @@
 # CastroCloud · Prepara o Proxmox Backup Server dun nodo para as copias do clúster.
 #
 # Hai un PBS en cada nodo (paquete proxmox-backup-server, web no porto 8007),
-# cada un co seu almacén nun disco propio (/dev/sdc). Así, se cae un nodo,
-# as copias seguen dispoñibles nos outros dous:
+# cada un co seu almacén en tres discos propios (/dev/sdc, sdd e sde) en
+# RAID-Z1, o RAID 5 de ZFS: aguanta que falle un dos tres discos. E, como hai
+# copias nos tres nodos, se cae un nodo enteiro seguen nos outros dous:
 #
 #   - pve1 é o PRINCIPAL: recibe a copia diaria do clúster ás 02:00.
 #   - pve2 e pve3 son SECUNDARIOS: cada noite traen (sync job) as copias novas
@@ -15,11 +16,11 @@
 #                (os datos de ORIXE móstraos o script ao rematar en pve1;
 #                 o segredo do token de sincronización pídese por teclado)
 #
-# Opcións: DISCO (por defecto sdc), ALMACEN (copias), SYNC_HORA (03:30).
+# Opcións: DISCOS (por defecto sdc,sdd,sde), ALMACEN (copias), SYNC_HORA (03:30).
 
 set -euo pipefail
 
-DISCO="${DISCO:-sdc}"
+DISCOS="${DISCOS:-sdc,sdd,sde}"
 ALMACEN="${ALMACEN:-copias}"
 SYNC_HORA="${SYNC_HORA:-03:30}"
 ORIXE="${ORIXE:-}"
@@ -30,8 +31,12 @@ info() { echo "==> $*"; }
 
 [[ $EUID -eq 0 ]] || erro "hai que executalo como root"
 command -v proxmox-backup-manager >/dev/null || erro "non está instalado proxmox-backup-server"
-DISCO="${DISCO#/dev/}"
-[[ -b "/dev/$DISCO" ]] || erro "non existe o disco /dev/$DISCO (mira con: lsblk)"
+DISCOS="${DISCOS//\/dev\//}"
+IFS=, read -ra LISTA <<< "$DISCOS"
+[[ ${#LISTA[@]} -ge 3 ]] || erro "o RAID-Z1 precisa polo menos tres discos (DISCOS=sdc,sdd,sde)"
+for d in "${LISTA[@]}"; do
+    [[ -b "/dev/$d" ]] || erro "non existe o disco /dev/$d (mira con: lsblk)"
+done
 if [[ -n "$ORIXE" ]]; then
     [[ -n "${ORIXE_PEGADA:-}" ]] || erro "nos secundarios fai falta ORIXE_PEGADA (móstraa o script en pve1)"
 fi
@@ -47,13 +52,15 @@ token() {   # token NOME ROL
     echo "$segredo"
 }
 
-# 1. Almacén das copias nun disco propio, separado do sistema
+# 1. Almacén das copias nun pool ZFS en RAID-Z1, separado do sistema
 if proxmox-backup-manager datastore list --output-format json | grep -q "\"name\":\"$ALMACEN\""; then
-    info "O almacén '$ALMACEN' xa existe: non se toca o disco"
+    info "O almacén '$ALMACEN' xa existe: non se tocan os discos"
 else
-    info "Formatando /dev/$DISCO (ext4) e creando o almacén '$ALMACEN'"
-    proxmox-backup-manager disk fs create "$ALMACEN" --disk "$DISCO" --filesystem ext4 --add-datastore true
+    info "Creando o pool ZFS '$ALMACEN' en RAID-Z1 con $DISCOS e o almacén das copias"
+    proxmox-backup-manager disk zpool create "$ALMACEN" --devices "$DISCOS" --raidlevel raidz \
+        --compression lz4 --add-datastore true
 fi
+zpool status "$ALMACEN" | head -n 12
 
 # 2. Mantemento automático (igual en todos os nodos)
 #    - garbage collection: libera o espazo dos bloques que xa non usa ningunha copia
