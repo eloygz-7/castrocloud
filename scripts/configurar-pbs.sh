@@ -45,8 +45,10 @@ fi
 token() {   # token NOME ROL
     local nome="$1" rol="$2" segredo="(xa creado antes: o segredo só se mostrou a primeira vez)"
     if ! proxmox-backup-manager user list-tokens "$USUARIO" --output-format json | grep -q "$USUARIO!$nome"; then
-        segredo="$(proxmox-backup-manager user generate-token "$USUARIO" "$nome" --output-format json \
-            | sed -n 's/.*"value":"\([^"]*\)".*/\1/p')"
+        # generate-token non admite --output-format: cóllese o segredo (un UUID) da súa saída
+        segredo="$(proxmox-backup-manager user generate-token "$USUARIO" "$nome" \
+            | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -n 1)"
+        [[ -n "$segredo" ]] || { echo "ERRO: non se puido crear o token $USUARIO!$nome" >&2; return 1; }
     fi
     proxmox-backup-manager acl update "/datastore/$ALMACEN" "$rol" --auth-id "$USUARIO!$nome" >/dev/null
     echo "$segredo"
