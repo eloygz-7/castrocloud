@@ -7,7 +7,7 @@
 #    o PC con Windows (pve2) ten poucos recursos e baixa lento pola wifi).
 #    Descárgase unha vez por nodo, porque o almacenamento "local" é propio de cada nodo.
 resource "proxmox_download_file" "plantilla_lxc" {
-  for_each = toset([for ct in var.contedores : ct.nodo])
+  for_each = local.nodos
 
   node_name          = each.key
   datastore_id       = "local"
@@ -49,8 +49,9 @@ resource "proxmox_virtual_environment_container" "demo" {
     swap      = 0
   }
 
+  # O disco vai no ZFS (almacenamento.tf) para poder replicalo aos outros nodos
   disk {
-    datastore_id = var.almacen_discos
+    datastore_id = proxmox_storage_zfspool.datos.id
     size         = 1
   }
 
@@ -81,5 +82,11 @@ resource "proxmox_virtual_environment_container" "demo" {
     user_account {
       password = random_password.root.result
     }
+  }
+
+  # Coa alta dispoñibilidade, Proxmox pode mover o contedor a outro nodo se cae
+  # o seu: Terraform non debe intentar devolvelo nin recrealo por iso.
+  lifecycle {
+    ignore_changes = [node_name]
   }
 }

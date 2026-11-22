@@ -2,6 +2,11 @@
 # terraform.tfvars está en .gitignore: o token NON se sube a git.
 proxmox_api_token = "terraform@pve!provider=00000000-0000-0000-0000-000000000000"
 
+# Copias no Proxmox Backup Server de pve1: estas liñas móstraas configurar-pbs.sh.
+# Mentres non se descomenten, Terraform non crea as copias.
+# pbs_segredo = "00000000-0000-0000-0000-000000000000"
+# pbs_pegada  = "aa:bb:cc:..."
+
 # Por defecto úsase a wifi da casa (192.168.0.0/24). Se a demo vai noutra wifi
 # (por exemplo, o punto de acceso do móbil), descomentar e cambiar as IP:
 # proxmox_endpoint = "https://192.168.43.211:8006/"

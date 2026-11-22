@@ -1,22 +1,23 @@
 #!/usr/bin/env bash
 # CastroCloud · Prepara o Proxmox Backup Server para recibir as copias do clúster.
 #
-# Execútase como root DENTRO do PBS (na súa Shell web ou por SSH), unha soa vez,
-# despois de instalalo.
+# O PBS vai instalado dentro de pve1 (paquete proxmox-backup-server, web no
+# porto 8007) e garda as copias no disco externo (/dev/sdc de pve1, ver
+# preparar-disco-externo.sh). Execútase como root en pve1, unha soa vez.
 #
 # Uso:   ./configurar-pbs.sh [DISCO] [ALMACEN]
-# Ex.:   ./configurar-pbs.sh            (usa /dev/sdb e o almacén "copias")
+# Ex.:   ./configurar-pbs.sh            (usa /dev/sdc e o almacén "copias")
 #
 # Fai o seguinte:
 #   1. Formata o disco de datos e crea nel o almacén (datastore) das copias.
 #   2. Programa a limpeza (garbage collection), a poda e a verificación.
 #   3. Crea o usuario castrocloud@pbs e un token só con permiso para facer
 #      copias nese almacén (DatastoreBackup), en vez de usar root.
-#   4. Mostra os datos que hai que levar ao clúster (configurar-copias.sh).
+#   4. Mostra os datos que hai que poñer en terraform.tfvars (pbs_segredo e pbs_pegada).
 
 set -euo pipefail
 
-DISCO="${1:-sdb}"
+DISCO="${1:-sdc}"
 ALMACEN="${2:-copias}"
 USUARIO="castrocloud@pbs"
 TOKEN="pve"
@@ -69,13 +70,11 @@ IP="$(hostname -I | awk '{print $1}')"
 
 cat <<FIN
 
-==> Feito. Datos para executar configurar-copias.sh en pve1:
+==> Feito. Engadir estas liñas a terraform.tfvars (no equipo de Eloy):
 
-    Servidor:  $IP
-    Almacén:   $ALMACEN
-    Token:     $USUARIO!$TOKEN
-    Segredo:   $SEGREDO
-    Pegada:    $PEGADA
+pbs_servidor = "$IP"
+pbs_segredo  = "$SEGREDO"
+pbs_pegada   = "$PEGADA"
 
 O segredo só se mostra agora: cópiao. Non se sube a git nin se ensina no vídeo.
 FIN

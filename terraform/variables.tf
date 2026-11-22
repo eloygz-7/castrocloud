@@ -41,10 +41,55 @@ variable "dns" {
   default     = ["1.1.1.1", "9.9.9.9"]
 }
 
-variable "almacen_discos" {
-  description = "Almacenamento de Proxmox para os discos dos contedores"
+variable "disco_zfs" {
+  description = "Disco de cada nodo para o pool ZFS «datos» (o segundo disco da MV, baleiro)"
   type        = string
-  default     = "local-lvm"
+  default     = "/dev/sdb"
+}
+
+variable "replicacion_cada" {
+  description = "Cada canto se replican os contedores aos outros nodos (formato de calendario de systemd)"
+  type        = string
+  default     = "*/5"
+}
+
+# Proxmox Backup Server instalado dentro de pve1 (ver configurar-pbs.sh).
+# Mentres pbs_pegada estea baleira, Terraform non crea nin o almacenamento nin a copia.
+variable "pbs_servidor" {
+  description = "IP do Proxmox Backup Server"
+  type        = string
+  default     = "192.168.0.211"
+}
+
+variable "pbs_almacen" {
+  description = "Almacén (datastore) do PBS onde se gardan as copias"
+  type        = string
+  default     = "copias"
+}
+
+variable "pbs_token_id" {
+  description = "Token do PBS con permiso só para facer copias"
+  type        = string
+  default     = "castrocloud@pbs!pve"
+}
+
+variable "pbs_segredo" {
+  description = "Segredo do token do PBS (vai en terraform.tfvars, que non se sube a git)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "pbs_pegada" {
+  description = "Pegada (fingerprint) do certificado do PBS; baleira = sen copias"
+  type        = string
+  default     = ""
+}
+
+variable "copia_hora" {
+  description = "Hora da copia diaria de todo o clúster"
+  type        = string
+  default     = "02:00"
 }
 
 variable "plantilla_lxc" {

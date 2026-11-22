@@ -18,6 +18,8 @@ param(
     [int]$RamMB = 4096,
     [int]$Cpus = 2,
     [int]$DiscoGB = 32,
+    # Segundo disco para o pool ZFS «datos» (replicación e alta dispoñibilidade); 0 = sen el
+    [int]$DatosGB = 16,
     [Parameter(Mandatory = $true)][string]$Iso,
     [Parameter(Mandatory = $true)][string]$Adaptador
 )
@@ -57,10 +59,18 @@ Executar modifyvm $Nome --memory $RamMB --cpus $Cpus --ioapic on `
     --nic1 bridged --bridge-adapter1 $Adaptador --nictype1 82540EM --nic-promisc1 allow-all `
     --boot1 disk --boot2 dvd --boot3 none --boot4 none --nested-hw-virt off
 
-Executar storagectl $Nome --name SATA --add sata --controller IntelAhci --portcount 2 --hostiocache on
+Executar storagectl $Nome --name SATA --add sata --controller IntelAhci --portcount 3 --hostiocache on
 Executar createmedium disk --filename $Disco --size ($DiscoGB * 1024) --format VDI
 Executar storageattach $Nome --storagectl SATA --port 0 --device 0 --type hdd --medium $Disco
 Executar storageattach $Nome --storagectl SATA --port 1 --device 0 --type dvddrive --medium $Iso
+
+# Disco de datos para ZFS: dentro do nodo verase como /dev/sdb
+if ($DatosGB -gt 0) {
+    $DiscoDatos = Join-Path $Cartafol "$Nome\$Nome-zfs.vdi"
+    Write-Host "==> Engadindo un disco de datos de $DatosGB GB para ZFS"
+    Executar createmedium disk --filename $DiscoDatos --size ($DatosGB * 1024) --format VDI
+    Executar storageattach $Nome --storagectl SATA --port 2 --device 0 --type hdd --medium $DiscoDatos
+}
 
 Write-Host "==> Feito. Arrancar desde a xanela de VirtualBox ou con:"
 Write-Host "    & `"$VBox`" startvm $Nome"
