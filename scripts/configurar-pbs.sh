@@ -80,6 +80,9 @@ proxmox-backup-manager verify-job list --output-format json | grep -q '"id":"ver
 # 3. Usuario e token para o clúster (permiso só para facer e restaurar copias)
 proxmox-backup-manager user list --output-format json | grep -q "\"userid\":\"$USUARIO\"" \
     || proxmox-backup-manager user create "$USUARIO" --comment "Copias do clúster CastroCloud"
+# Os permisos efectivos dun token son os que teñen á vez o token E o seu usuario:
+# o usuario precisa un rol que inclúa os dos tokens (copias e lectura).
+proxmox-backup-manager acl update "/datastore/$ALMACEN" DatastorePowerUser --auth-id "$USUARIO"
 SEGREDO_PVE="$(token pve DatastoreBackup)"
 
 NODO="$(hostname -s)"
