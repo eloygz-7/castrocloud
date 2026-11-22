@@ -1,32 +1,39 @@
-# Copias de seguridade no Proxmox Backup Server, instalado dentro de pve1 e con
-# o almacén no disco externo (ver scripts/configurar-pbs.sh).
-# Só se crean cando en terraform.tfvars están pbs_pegada e pbs_segredo.
+# Copias de seguridade: un Proxmox Backup Server en cada nodo, cada un co seu
+# almacén nun disco propio (ver scripts/configurar-pbs.sh).
+#   - O PBS principal (pve1) recibe a copia diaria de todo o clúster.
+#   - Os PBS de pve2 e pve3 tráena del cada noite (sync job), así que, se cae
+#     un nodo, as copias seguen nos outros dous e pódense restaurar desde a web.
 
-# 1. O PBS como almacenamento do clúster (só para copias)
+locals {
+  pbs_activos = { for nodo, p in var.pbs : nodo => p if p.pegada != "" }
+}
+
+# 1. Cada PBS como almacenamento do clúster (só para copias)
 resource "proxmox_storage_pbs" "copias" {
-  count = var.pbs_pegada == "" ? 0 : 1
+  for_each = local.pbs_activos
 
-  id          = "pbs-castrocloud"
-  server      = var.pbs_servidor
+  id          = "pbs-${each.key}"
+  server      = each.value.servidor
   datastore   = var.pbs_almacen
   username    = var.pbs_token_id
-  password    = var.pbs_segredo
-  fingerprint = var.pbs_pegada
+  password    = var.pbs_segredos[each.key]
+  fingerprint = each.value.pegada
   content     = ["backup"]
 }
 
-# 2. Copia diaria de todos os contedores e MV do clúster, sen paralos (snapshot).
-#    A retención (7 diarias, 4 semanais e 3 mensuais) faina o propio PBS.
+# 2. Copia diaria de todos os contedores e MV do clúster ao PBS principal, sen
+#    paralos (snapshot). A retención (7 diarias, 4 semanais e 3 mensuais) faina
+#    cada PBS.
 resource "proxmox_backup_job" "diaria" {
-  count = length(proxmox_storage_pbs.copias)
+  count = contains(keys(local.pbs_activos), var.pbs_principal) ? 1 : 0
 
   id             = "copia-diaria"
   schedule       = var.copia_hora
-  storage        = proxmox_storage_pbs.copias[0].id
+  storage        = proxmox_storage_pbs.copias[var.pbs_principal].id
   all            = true
   mode           = "snapshot"
   compress       = "zstd"
   enabled        = true
   notes_template = "{{guestname}} ({{node}})"
-  comment        = "Copia diaria de todo o clúster (Terraform)"
+  comment        = "Copia diaria de todo o clúster ao PBS de ${var.pbs_principal} (Terraform)"
 }

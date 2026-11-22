@@ -5,20 +5,23 @@
 # Restaura a última copia dun contedor nun contedor temporal, arráncao,
 # comproba que funciona e bórrao. Deixa o resultado no rexistro.
 #
-# Execútase como root en pve1 (a man ou cada mes con cron):
+# Execútase como root en CADA nodo (a man ou cada mes con cron) e usa o PBS
+# dese nodo, así que comproba que as copias se poden restaurar desde os tres:
 #   ./probar-restauracion.sh [CTID]        (por defecto, 201 = ct-pve1-1)
 #
 # O contedor temporal arranca coa rede desconectada (link_down), para non
-# chocar coa IP do contedor orixinal, que segue funcionando.
+# chocar coa IP do contedor orixinal, que segue funcionando. O seu ID é 29N
+# (N = número do nodo: 291 en pve1, 292 en pve2...), para que as probas dos
+# tres nodos non choquen.
 
 set -euo pipefail
 
 CTID="${1:-201}"
-PROBA="${PROBA_ID:-299}"
-COPIAS="${COPIAS:-pbs-castrocloud}"
+NODO="$(hostname -s)"
+PROBA="${PROBA_ID:-29${NODO//[!0-9]/}}"
+COPIAS="${COPIAS:-pbs-$NODO}"
 DESTINO="${DESTINO:-zfs-datos}"
 REXISTRO="/var/log/castrocloud-restauracion.log"
-NODO="$(hostname)"
 
 log() { echo "$(date '+%F %T') $*" | tee -a "$REXISTRO"; }
 falla() { log "FALLO ct $CTID: $*"; limpar; exit 1; }

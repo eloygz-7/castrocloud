@@ -53,12 +53,28 @@ variable "replicacion_cada" {
   default     = "*/5"
 }
 
-# Proxmox Backup Server instalado dentro de pve1 (ver configurar-pbs.sh).
-# Mentres pbs_pegada estea baleira, Terraform non crea nin o almacenamento nin a copia.
-variable "pbs_servidor" {
-  description = "IP do Proxmox Backup Server"
+# Un Proxmox Backup Server en cada nodo (ver configurar-pbs.sh). Os datos de cada
+# un móstraos o script e van en terraform.tfvars. Un PBS sen datos non se crea.
+variable "pbs" {
+  description = "PBS de cada nodo: nome do nodo => IP e pegada (fingerprint) do certificado"
+  type = map(object({
+    servidor = string
+    pegada   = string
+  }))
+  default = {}
+}
+
+variable "pbs_segredos" {
+  description = "Segredo do token castrocloud@pbs!pve de cada PBS (en terraform.tfvars, que non se sube a git)"
+  type        = map(string)
+  default     = {}
+  sensitive   = true
+}
+
+variable "pbs_principal" {
+  description = "Nodo cuxo PBS recibe a copia diaria; os outros tráena del cada noite"
   type        = string
-  default     = "192.168.0.211"
+  default     = "pve1"
 }
 
 variable "pbs_almacen" {
@@ -71,19 +87,6 @@ variable "pbs_token_id" {
   description = "Token do PBS con permiso só para facer copias"
   type        = string
   default     = "castrocloud@pbs!pve"
-}
-
-variable "pbs_segredo" {
-  description = "Segredo do token do PBS (vai en terraform.tfvars, que non se sube a git)"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
-variable "pbs_pegada" {
-  description = "Pegada (fingerprint) do certificado do PBS; baleira = sen copias"
-  type        = string
-  default     = ""
 }
 
 variable "copia_hora" {

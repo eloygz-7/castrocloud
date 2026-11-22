@@ -2,11 +2,10 @@
 # CastroCloud · Prepara o disco externo USB no equipo de Eloy (Ubuntu) e engade
 # discos virtuais novos a pve1 e pve3, gardados nese disco externo:
 #
-#   pve1: /dev/sdb  disco ZFS (datos dos contedores, replicados entre nodos)
-#         /dev/sdc  almacén do Proxmox Backup Server (as copias)
-#   pve3: /dev/sdb  disco ZFS
+#   pve1 e pve3: /dev/sdb  disco ZFS (datos dos contedores, replicados entre nodos)
+#                /dev/sdc  almacén do Proxmox Backup Server dese nodo (as copias)
 #
-# O nodo pve2 (Windows) leva o seu disco ZFS no propio PC con Windows.
+# O nodo pve2 (Windows) leva os seus dous discos no propio PC con Windows.
 #
 # Uso:   ./preparar-disco-externo.sh /dev/sdX
 #        (o disco externo; mírase con: lsblk -o NAME,SIZE,TRAN,MODEL)
@@ -15,13 +14,13 @@
 # pve1 e pve3 teñen que estar APAGADAS (VBoxManage controlvm pveN acpipowerbutton).
 #
 # Variables opcionais (tamaños en GB; os discos son dinámicos: ocupan o que se usa):
-#   ZFS_GB=32  PBS_GB=500  PUNTO=/mnt/castrocloud
+#   ZFS_GB=32  PBS_GB=300  PUNTO=/mnt/castrocloud
 
 set -euo pipefail
 
 DISCO="${1:?Uso: $0 /dev/sdX   (o disco externo; mírao con: lsblk -o NAME,SIZE,TRAN,MODEL)}"
 ZFS_GB="${ZFS_GB:-32}"
-PBS_GB="${PBS_GB:-500}"
+PBS_GB="${PBS_GB:-300}"
 PUNTO="${PUNTO:-/mnt/castrocloud}"
 ETIQUETA="castrocloud"
 
@@ -81,10 +80,11 @@ engadir() {   # engadir MV PORTO NOME TAMAÑO_GB
 }
 
 VBoxManage storagectl pve1 --name SATA --portcount 4
-VBoxManage storagectl pve3 --name SATA --portcount 3
+VBoxManage storagectl pve3 --name SATA --portcount 4
 engadir pve1 2 zfs "$ZFS_GB"
 engadir pve1 3 pbs "$PBS_GB"
 engadir pve3 2 zfs "$ZFS_GB"
+engadir pve3 3 pbs "$PBS_GB"
 
 info "Feito. Conecta sempre o disco externo ANTES de arrancar pve1 e pve3:"
 echo "    VBoxManage startvm pve1 --type headless"

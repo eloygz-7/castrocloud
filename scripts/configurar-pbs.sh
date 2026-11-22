@@ -1,34 +1,51 @@
 #!/usr/bin/env bash
-# CastroCloud · Prepara o Proxmox Backup Server para recibir as copias do clúster.
+# CastroCloud · Prepara o Proxmox Backup Server dun nodo para as copias do clúster.
 #
-# O PBS vai instalado dentro de pve1 (paquete proxmox-backup-server, web no
-# porto 8007) e garda as copias no disco externo (/dev/sdc de pve1, ver
-# preparar-disco-externo.sh). Execútase como root en pve1, unha soa vez.
+# Hai un PBS en cada nodo (paquete proxmox-backup-server, web no porto 8007),
+# cada un co seu almacén nun disco propio (/dev/sdc). Así, se cae un nodo,
+# as copias seguen dispoñibles nos outros dous:
 #
-# Uso:   ./configurar-pbs.sh [DISCO] [ALMACEN]
-# Ex.:   ./configurar-pbs.sh            (usa /dev/sdc e o almacén "copias")
+#   - pve1 é o PRINCIPAL: recibe a copia diaria do clúster ás 02:00.
+#   - pve2 e pve3 son SECUNDARIOS: cada noite traen (sync job) as copias novas
+#     do principal e borran as que o principal xa podou.
 #
-# Fai o seguinte:
-#   1. Formata o disco de datos e crea nel o almacén (datastore) das copias.
-#   2. Programa a limpeza (garbage collection), a poda e a verificación.
-#   3. Crea o usuario castrocloud@pbs e un token só con permiso para facer
-#      copias nese almacén (DatastoreBackup), en vez de usar root.
-#   4. Mostra os datos que hai que poñer en terraform.tfvars (pbs_segredo e pbs_pegada).
+# Execútase como root en cada nodo, unha soa vez, primeiro en pve1:
+#   pve1:        ./configurar-pbs.sh
+#   pve2 e pve3: ORIXE=192.168.0.211 ORIXE_PEGADA=aa:bb:... ./configurar-pbs.sh
+#                (os datos de ORIXE móstraos o script ao rematar en pve1;
+#                 o segredo do token de sincronización pídese por teclado)
+#
+# Opcións: DISCO (por defecto sdc), ALMACEN (copias), SYNC_HORA (03:30).
 
 set -euo pipefail
 
-DISCO="${1:-sdc}"
-ALMACEN="${2:-copias}"
+DISCO="${DISCO:-sdc}"
+ALMACEN="${ALMACEN:-copias}"
+SYNC_HORA="${SYNC_HORA:-03:30}"
+ORIXE="${ORIXE:-}"
 USUARIO="castrocloud@pbs"
-TOKEN="pve"
 
 erro() { echo "ERRO: $*" >&2; exit 1; }
 info() { echo "==> $*"; }
 
 [[ $EUID -eq 0 ]] || erro "hai que executalo como root"
-command -v proxmox-backup-manager >/dev/null || erro "isto non parece un Proxmox Backup Server"
+command -v proxmox-backup-manager >/dev/null || erro "non está instalado proxmox-backup-server"
 DISCO="${DISCO#/dev/}"
 [[ -b "/dev/$DISCO" ]] || erro "non existe o disco /dev/$DISCO (mira con: lsblk)"
+if [[ -n "$ORIXE" ]]; then
+    [[ -n "${ORIXE_PEGADA:-}" ]] || erro "nos secundarios fai falta ORIXE_PEGADA (móstraa o script en pve1)"
+fi
+
+# Crea un token do usuario e dálle un rol no almacén. Devolve o segredo (só a primeira vez).
+token() {   # token NOME ROL
+    local nome="$1" rol="$2" segredo="(xa creado antes: o segredo só se mostrou a primeira vez)"
+    if ! proxmox-backup-manager user list-tokens "$USUARIO" --output-format json | grep -q "$USUARIO!$nome"; then
+        segredo="$(proxmox-backup-manager user generate-token "$USUARIO" "$nome" --output-format json \
+            | sed -n 's/.*"value":"\([^"]*\)".*/\1/p')"
+    fi
+    proxmox-backup-manager acl update "/datastore/$ALMACEN" "$rol" --auth-id "$USUARIO!$nome" >/dev/null
+    echo "$segredo"
+}
 
 # 1. Almacén das copias nun disco propio, separado do sistema
 if proxmox-backup-manager datastore list --output-format json | grep -q "\"name\":\"$ALMACEN\""; then
@@ -38,7 +55,7 @@ else
     proxmox-backup-manager disk fs create "$ALMACEN" --disk "$DISCO" --filesystem ext4 --add-datastore true
 fi
 
-# 2. Mantemento automático
+# 2. Mantemento automático (igual en todos os nodos)
 #    - garbage collection: libera o espazo dos bloques que xa non usa ningunha copia
 #    - poda: garda 7 copias diarias, 4 semanais e 3 mensuais
 #    - verificación: comproba cada semana que as copias se poden ler
@@ -51,30 +68,58 @@ proxmox-backup-manager verify-job list --output-format json | grep -q '"id":"ver
     || proxmox-backup-manager verify-job create verificacion-semanal --store "$ALMACEN" --schedule "sat 03:00" \
         --ignore-verified true --outdated-after 30
 
-# 3. Usuario e token con permisos mínimos
+# 3. Usuario e token para o clúster (permiso só para facer e restaurar copias)
 proxmox-backup-manager user list --output-format json | grep -q "\"userid\":\"$USUARIO\"" \
     || proxmox-backup-manager user create "$USUARIO" --comment "Copias do clúster CastroCloud"
+SEGREDO_PVE="$(token pve DatastoreBackup)"
 
-if proxmox-backup-manager user list-tokens "$USUARIO" --output-format json | grep -q "$USUARIO!$TOKEN"; then
-    info "O token $USUARIO!$TOKEN xa existe: non se volve crear (o segredo só se mostrou a primeira vez)"
-    SEGREDO="(xa creado antes)"
-else
-    SEGREDO="$(proxmox-backup-manager user generate-token "$USUARIO" "$TOKEN" --output-format json \
-        | sed -n 's/.*"value":"\([^"]*\)".*/\1/p')"
-fi
-proxmox-backup-manager acl update "/datastore/$ALMACEN" DatastoreBackup --auth-id "$USUARIO!$TOKEN"
-
-# 4. Datos para o clúster
-PEGADA="$(proxmox-backup-manager cert info | awk '/Fingerprint/ {print $NF}')"
+NODO="$(hostname -s)"
 IP="$(hostname -I | awk '{print $1}')"
+PEGADA="$(proxmox-backup-manager cert info | awk '/Fingerprint/ {print $NF}')"
+
+# 4a. Principal: token de só lectura para que os secundarios traian as copias
+if [[ -z "$ORIXE" ]]; then
+    SEGREDO_SYNC="$(token sync DatastoreReader)"
+    EXTRA="$(cat <<FIN
+==> Para pve2 e pve3 (executar alí o script con):
+
+    ORIXE=$IP ORIXE_PEGADA=$PEGADA ./configurar-pbs.sh
+
+    Segredo do token de sincronización ($USUARIO!sync): $SEGREDO_SYNC
+FIN
+)"
+
+# 4b. Secundario: remoto cara ao principal e sincronización diaria
+else
+    if proxmox-backup-manager remote list --output-format json | grep -q '"name":"principal"'; then
+        info "O remoto 'principal' xa existe"
+    else
+        read -rsp "Segredo do token $USUARIO!sync do principal: " SEGREDO_SYNC; echo
+        [[ -n "$SEGREDO_SYNC" ]] || erro "o segredo non pode estar baleiro"
+        proxmox-backup-manager remote create principal --host "$ORIXE" \
+            --auth-id "$USUARIO!sync" --password "$SEGREDO_SYNC" --fingerprint "$ORIXE_PEGADA" \
+            --comment "PBS principal (pve1)"
+    fi
+    proxmox-backup-manager sync-job list --output-format json | grep -q '"id":"desde-principal"' \
+        || proxmox-backup-manager sync-job create desde-principal --store "$ALMACEN" \
+            --remote principal --remote-store "$ALMACEN" --schedule "$SYNC_HORA" \
+            --remove-vanished true --comment "Copias do PBS principal"
+    info "Sincronización programada ás $SYNC_HORA. Para traer xa as copias: proxmox-backup-manager sync-job run desde-principal"
+    EXTRA=""
+fi
 
 cat <<FIN
 
-==> Feito. Engadir estas liñas a terraform.tfvars (no equipo de Eloy):
+==> Feito en $NODO. En terraform.tfvars (no equipo de Eloy), dentro de cada bloque:
 
-pbs_servidor = "$IP"
-pbs_segredo  = "$SEGREDO"
-pbs_pegada   = "$PEGADA"
+pbs = {
+  $NODO = { servidor = "$IP", pegada = "$PEGADA" }
+}
+pbs_segredos = {
+  $NODO = "$SEGREDO_PVE"
+}
 
-O segredo só se mostra agora: cópiao. Non se sube a git nin se ensina no vídeo.
+$EXTRA
+
+Os segredos só se mostran agora: cópiaos. Non se soben a git nin se ensinan no vídeo.
 FIN

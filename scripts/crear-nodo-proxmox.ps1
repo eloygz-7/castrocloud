@@ -20,6 +20,8 @@ param(
     [int]$DiscoGB = 32,
     # Segundo disco para o pool ZFS «datos» (replicación e alta dispoñibilidade); 0 = sen el
     [int]$DatosGB = 16,
+    # Terceiro disco para o almacén do Proxmox Backup Server deste nodo; 0 = sen el
+    [int]$CopiasGB = 32,
     [Parameter(Mandatory = $true)][string]$Iso,
     [Parameter(Mandatory = $true)][string]$Adaptador
 )
@@ -59,7 +61,7 @@ Executar modifyvm $Nome --memory $RamMB --cpus $Cpus --ioapic on `
     --nic1 bridged --bridge-adapter1 $Adaptador --nictype1 82540EM --nic-promisc1 allow-all `
     --boot1 disk --boot2 dvd --boot3 none --boot4 none --nested-hw-virt off
 
-Executar storagectl $Nome --name SATA --add sata --controller IntelAhci --portcount 3 --hostiocache on
+Executar storagectl $Nome --name SATA --add sata --controller IntelAhci --portcount 4 --hostiocache on
 Executar createmedium disk --filename $Disco --size ($DiscoGB * 1024) --format VDI
 Executar storageattach $Nome --storagectl SATA --port 0 --device 0 --type hdd --medium $Disco
 Executar storageattach $Nome --storagectl SATA --port 1 --device 0 --type dvddrive --medium $Iso
@@ -70,6 +72,14 @@ if ($DatosGB -gt 0) {
     Write-Host "==> Engadindo un disco de datos de $DatosGB GB para ZFS"
     Executar createmedium disk --filename $DiscoDatos --size ($DatosGB * 1024) --format VDI
     Executar storageattach $Nome --storagectl SATA --port 2 --device 0 --type hdd --medium $DiscoDatos
+}
+
+# Disco para as copias (PBS): dentro do nodo verase como /dev/sdc
+if ($CopiasGB -gt 0) {
+    $DiscoCopias = Join-Path $Cartafol "$Nome\$Nome-pbs.vdi"
+    Write-Host "==> Engadindo un disco de $CopiasGB GB para as copias"
+    Executar createmedium disk --filename $DiscoCopias --size ($CopiasGB * 1024) --format VDI
+    Executar storageattach $Nome --storagectl SATA --port 3 --device 0 --type hdd --medium $DiscoCopias
 }
 
 Write-Host "==> Feito. Arrancar desde a xanela de VirtualBox ou con:"
