@@ -6,7 +6,7 @@ options {
 
     // Só resolve para a rede interna: non é un DNS aberto a Internet
     recursion yes;
-    allow-recursion { 127.0.0.1; {{ rede_local }}; 172.16.0.0/12; };
+    allow-recursion { 127.0.0.1; {% for r in redes_internas %}{{ r }}; {% endfor %} 172.16.0.0/12; };
     allow-transfer { none; };
     forwarders { {% for d in dns_externos %}{{ d }}; {% endfor %}};
     forward only;

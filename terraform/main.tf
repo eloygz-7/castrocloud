@@ -55,9 +55,11 @@ resource "proxmox_virtual_environment_container" "servizo" {
     size         = each.value.disco
   }
 
+  # Na troncal, coa etiqueta da VLAN do servidor (o enrutador é OPNsense)
   network_interface {
-    name   = "eth0"
-    bridge = "vmbr0"
+    name    = "eth0"
+    bridge  = proxmox_network_linux_bridge.troncal[each.value.nodo].name
+    vlan_id = var.vlans[each.value.vlan].id
   }
 
   operating_system {
@@ -72,7 +74,7 @@ resource "proxmox_virtual_environment_container" "servizo" {
       ipv4 {
         address = "${each.value.ip}/24"
         # O seu nodo fai de pasarela con NAT (pola wifi non chegan ao router)
-        gateway = var.ip_nodos[each.value.nodo]
+        gateway = "${var.vlans[each.value.vlan].rede}.1"
       }
     }
 

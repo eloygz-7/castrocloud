@@ -27,8 +27,8 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 SEGREDOS="${SEGREDOS:-$DIR/../ansible/segredos}"
-IP_SERVIZOS="${IP_SERVIZOS:-192.168.0.233}"
-IP_NEXTCLOUD="${IP_NEXTCLOUD:-192.168.0.231}"
+IP_SERVIZOS="${IP_SERVIZOS:-10.10.10.13}"
+IP_NEXTCLOUD="${IP_NEXTCLOUD:-10.10.10.11}"
 DOMINIO="${DOMINIO:-castrocloud.lan}"
 LLDAP="http://$IP_SERVIZOS:17170"
 ALTAS="${ALTAS:-$DIR/../altas}"

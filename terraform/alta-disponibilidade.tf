@@ -48,10 +48,13 @@ resource "proxmox_haresource" "contedores" {
 resource "proxmox_harule" "preferencia" {
   for_each = local.servizos
 
-  rule      = "preferir-${each.key}"
-  type      = "node-affinity"
-  comment   = "Os contedores de ${each.key} prefiren ese nodo"
-  resources = [for nome, ct in var.contedores : proxmox_haresource.contedores[nome].resource_id if ct.nodo == each.key]
-  nodes     = { for n in local.servizos : n => (n == each.key ? 2 : 1) }
-  strict    = true
+  rule    = "preferir-${each.key}"
+  type    = "node-affinity"
+  comment = "Os contedores de ${each.key} prefiren ese nodo"
+  resources = concat(
+    [for nome, ct in var.contedores : proxmox_haresource.contedores[nome].resource_id if ct.nodo == each.key],
+    var.opnsense.nodo == each.key ? [proxmox_haresource.opnsense.resource_id] : []
+  )
+  nodes  = { for n in local.servizos : n => (n == each.key ? 2 : 1) }
+  strict = true
 }

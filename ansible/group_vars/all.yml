@@ -5,8 +5,9 @@ base_dn: dc=castrocloud,dc=lan
 zona_horaria: Europe/Madrid
 directorio_servizos: /opt/castrocloud
 
-# Rede da demo (a wifi). Se cambia, cambiar tamén en terraform.tfvars.
-rede_local: 192.168.0.0/24
+# Redes internas (VLANs detrás de OPNsense e rede de administración).
+# Se cambian, cambiar tamén var.vlans en Terraform.
+redes_internas: [10.10.0.0/16, 192.168.56.0/24]
 dns_externos: [1.1.1.1, 9.9.9.9]
 nodos_proxmox:
   pve1: 192.168.0.211

@@ -20,20 +20,21 @@ variable "nodos_servizos" {
 }
 
 variable "contedores" {
-  description = "Servidores dos servizos: nome => nodo preferido, ID, IP, RAM (MB), disco (GB) e núcleos"
+  description = "Servidores dos servizos: nome => nodo preferido, ID, VLAN, IP, RAM (MB), disco (GB) e núcleos"
   type = map(object({
     nodo    = string
     vm_id   = number
+    vlan    = string
     ip      = string
     ram     = number
     disco   = number
     nucleos = number
   }))
   default = {
-    ct-nextcloud = { nodo = "pve1", vm_id = 211, ip = "192.168.0.231", ram = 1536, disco = 10, nucleos = 2 } # Nextcloud e o seu MySQL
-    ct-web       = { nodo = "pve3", vm_id = 212, ip = "192.168.0.232", ram = 512, disco = 4, nucleos = 1 }   # WordPress con Nginx e MySQL
-    ct-servizos  = { nodo = "pve3", vm_id = 213, ip = "192.168.0.233", ram = 512, disco = 2, nucleos = 1 }   # lldap e Bind9
-    ct-zabbix    = { nodo = "pve3", vm_id = 214, ip = "192.168.0.234", ram = 1024, disco = 4, nucleos = 1 }  # Zabbix e o seu MySQL
+    ct-nextcloud = { nodo = "pve1", vm_id = 211, vlan = "servizos", ip = "10.10.10.11", ram = 1536, disco = 10, nucleos = 2 } # Nextcloud e o seu MySQL
+    ct-web       = { nodo = "pve3", vm_id = 212, vlan = "servizos", ip = "10.10.10.12", ram = 512, disco = 4, nucleos = 1 }   # WordPress con Nginx e MySQL
+    ct-servizos  = { nodo = "pve3", vm_id = 213, vlan = "servizos", ip = "10.10.10.13", ram = 512, disco = 2, nucleos = 1 }   # lldap e Bind9
+    ct-zabbix    = { nodo = "pve3", vm_id = 214, vlan = "xestion", ip = "10.10.20.11", ram = 1024, disco = 4, nucleos = 1 }   # Zabbix e o seu MySQL
   }
 }
 
@@ -45,8 +46,8 @@ variable "ssh_clave_publica" {
 
 variable "ip_nodos" {
   description = <<-EOT
-    IP de cada nodo. Cada servidor usa o seu nodo preferido como pasarela (NAT,
-    ver scripts/configurar-nat.sh): pola wifi os contedores non chegan ao router.
+    IP de cada nodo na wifi. Os servidores xa non os usan como pasarela: saen
+    a Internet por OPNsense (ver rede.tf e opnsense.tf).
   EOT
   type        = map(string)
   default = {
@@ -132,4 +133,64 @@ variable "plantilla_lxc" {
     url    = "http://download.proxmox.com/images/system/debian-13-standard_13.6-1_amd64.tar.zst"
     sha512 = "4c0c27ca6ceab5ef0b84db57825a00f26157ef1854bafe97297813e1cbe8ecb8cc9c453cab6b3b0efe1ba193a50c47ece1e41d950e411b8730b835b71e9e754b"
   }
+}
+
+# --- Rede: OPNsense e VLANs (rede.tf e opnsense.tf) ---
+
+variable "interface_troncal" {
+  description = "Tarxeta de cada nodo conectada á troncal (a segunda tarxeta da MV, a rede «só anfitrión» de VirtualBox)"
+  type        = string
+  default     = "enp0s8"
+}
+
+variable "vlans" {
+  description = "VLANs da troncal: nome => etiqueta e rede /24 (OPNsense é a .1 de cada unha)"
+  type = map(object({
+    id   = number
+    rede = string
+  }))
+  default = {
+    servizos = { id = 10, rede = "10.10.10" } # Nextcloud, web, lldap e DNS
+    xestion  = { id = 20, rede = "10.10.20" } # Zabbix
+    iaas     = { id = 30, rede = "10.10.30" } # Servidores dos clientes, illados
+  }
+}
+
+variable "saida_opnsense" {
+  description = <<-EOT
+    Rede interna de cada nodo pola que OPNsense sae a Internet (o nodo é a .1 e
+    fai NAT, ver scripts/configurar-nat.sh). É igual nos dous nodos, así que
+    OPNsense segue con Internet se a alta dispoñibilidade o move.
+  EOT
+  type        = string
+  default     = "10.99.0.1/30"
+}
+
+variable "opnsense" {
+  description = "Máquina virtual de OPNsense (cortalumes e enrutador das VLANs)"
+  type = object({
+    nodo  = string
+    vm_id = number
+    ram   = number
+    disco = number
+  })
+  default = { nodo = "pve1", vm_id = 200, ram = 1536, disco = 10 }
+}
+
+variable "opnsense_iso" {
+  description = "Imaxe de instalación de OPNsense (comprimida con bzip2) e a súa suma SHA-256"
+  type = object({
+    url    = string
+    sha256 = string
+  })
+  default = {
+    url    = "https://pkg.opnsense.org/releases/26.7/OPNsense-26.7-dvd-amd64.iso.bz2"
+    sha256 = "95cafedda6d5b22ce832e249dc2309110fbee19f813ad78cf28bb3d387186bfb"
+  }
+}
+
+variable "opnsense_instalado" {
+  description = "Poñer a true despois de instalar OPNsense no disco: quítase o DVD de instalación"
+  type        = bool
+  default     = false
 }

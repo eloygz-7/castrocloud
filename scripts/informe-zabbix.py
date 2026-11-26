@@ -11,7 +11,7 @@ Ansible instálao en ct-zabbix e execútao cada día ás 07:00 (cron), cos datos
 de acceso en /etc/castrocloud/informe-zabbix.ini. Tamén se pode lanzar a man
 desde o equipo de Eloy e abrir o informe no navegador:
 
-  python3 informe-zabbix.py --url http://192.168.0.234 \\
+  python3 informe-zabbix.py --url http://10.10.20.11 \\
       --contrasinal-ficheiro ../ansible/segredos/zabbix_admin --saida informe.html
 """
 
@@ -182,7 +182,7 @@ def main():
     p = argparse.ArgumentParser(description="Informe diario de CastroCloud cos datos de Zabbix")
     p.add_argument("--config", default="/etc/castrocloud/informe-zabbix.ini",
                    help="ficheiro con url, usuario, contrasinal e directorio (sección [zabbix])")
-    p.add_argument("--url", help="URL da web de Zabbix, p. ex. http://192.168.0.234")
+    p.add_argument("--url", help="URL da web de Zabbix, p. ex. http://10.10.20.11")
     p.add_argument("--usuario", help="usuario de Zabbix (por defecto Admin)")
     p.add_argument("--contrasinal-ficheiro", help="ficheiro co contrasinal (mellor que escribilo na orde)")
     p.add_argument("--saida", help="ficheiro HTML de saída (por defecto, un por día no directorio)")

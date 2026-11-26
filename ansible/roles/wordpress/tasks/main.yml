@@ -78,6 +78,15 @@
   delay: 10
   no_log: true
 
+# Se cambia a IP do servidor (p. ex. ao pasar á VLAN), a web ten que saber a nova
+- name: Enderezo da web
+  ansible.builtin.command:
+    argv: [docker, compose, run, --rm, cli, wp, option, update, "{{ item }}", "http://{{ ip_web }}"]
+    chdir: "{{ directorio_servizos }}/wordpress"
+  loop: [home, siteurl]
+  register: enderezo
+  changed_when: "'unchanged' not in enderezo.stdout"
+
 - name: Web en galego e enlaces permanentes lexibles
   ansible.builtin.command: docker compose run --rm cli wp {{ item }}
   args:

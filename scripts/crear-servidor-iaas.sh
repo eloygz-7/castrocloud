@@ -10,11 +10,12 @@
 # Execútase como root nun nodo de servizos (pve1 ou pve3):
 #   crear-servidor-iaas.sh CLIENTE TAMAÑO IP "CLAVE_SSH_PÚBLICA_DO_CLIENTE"
 # Desde o equipo de Eloy, sen copiar o script ao nodo (exemplo):
-#   ssh root@192.168.0.213 "bash -s -- asesoria-rias S 192.168.0.241 '$(cat ~/.ssh/id_ed25519.pub)'" < crear-servidor-iaas.sh
+#   ssh root@192.168.0.213 "bash -s -- asesoria-rias S 10.10.30.101 '$(cat ~/.ssh/id_ed25519.pub)'" < crear-servidor-iaas.sh
 #
-# A IP vai de .240 a .254: esas IP saen a Internet polo NAT do nodo
-# (scripts/configurar-nat.sh). O cliente entra por SSH co usuario «cliente» e
-# a súa clave pública (sen contrasinal).
+# O servidor vai na VLAN 30 (IaaS), illada das VLANs dos servizos por
+# OPNsense, que é a súa pasarela (10.10.30.1). A IP vai de 10.10.30.100 a
+# 10.10.30.199. O cliente entra por SSH co usuario «cliente» e a súa clave
+# pública (sen contrasinal).
 #
 # A primeira vez en cada nodo crea a plantilla (descarga uns 400 MB). Despois
 # cada servidor é un clon ligado da plantilla en ZFS: créase en segundos e só
@@ -24,8 +25,10 @@ set -euo pipefail
 
 CLIENTE="${1:-}"; TAMANO="${2:-}"; IP="${3:-}"; CLAVE="${4:-}"
 ALMACEN="${ALMACEN:-zfs-datos}"
-PONTE="${PONTE:-vmbr0}"
-DNS="${DNS:-192.168.0.233}"
+PONTE="${PONTE:-vmbr1}"
+VLAN="${VLAN:-30}"
+PASARELA="${PASARELA:-10.10.30.1}"
+DNS="${DNS:-10.10.10.13}"
 DOMINIO="${DOMINIO:-castrocloud.lan}"
 IMAXE_URL="https://cloud.debian.org/images/cloud/trixie/latest"
 IMAXE="debian-13-genericcloud-amd64.qcow2"
@@ -43,12 +46,11 @@ case "${TAMANO^^}" in
     L) CPU=4; RAM=8192; DISCO=160 ;;
     *) erro "tamaño descoñecido: $TAMANO (S, M ou L)" ;;
 esac
-[[ "$IP" =~ ^192\.168\.0\.(24[0-9]|25[0-4])$ ]] || erro "a IP ten que ir de 192.168.0.240 a 192.168.0.254"
-ping -c1 -W1 "$IP" >/dev/null 2>&1 && erro "a IP $IP xa está en uso"
+[[ "$IP" =~ ^10\.10\.30\.1[0-9][0-9]$ ]] || erro "a IP ten que ir de 10.10.30.100 a 10.10.30.199"
+grep -qs "ip=$IP/" /etc/pve/nodes/*/qemu-server/*.conf && erro "a IP $IP xa a ten outro servidor"
 [[ "$CLAVE" =~ ^ssh-(ed25519|rsa)\  ]] || erro "a clave SSH non parece unha clave pública (ssh-ed25519 ... ou ssh-rsa ...)"
 
 NODO="$(hostname -s)"
-PASARELA="$(hostname -I | awk '{print $1}')"   # o propio nodo, que fai NAT
 PLANTILLA=$((9000 + ${NODO//[!0-9]/}))         # 9001 en pve1, 9003 en pve3
 
 # As MV de Proxmox dentro de VirtualBox poden non ter virtualización aniñada:
@@ -67,7 +69,7 @@ if ! qm status "$PLANTILLA" >/dev/null 2>&1; then
     (cd "$TMP" && grep " $IMAXE\$" SHA512SUMS | sha512sum -c --quiet) || erro "a imaxe descargada está corrupta"
 
     qm create "$PLANTILLA" --name plantilla-debian13 --ostype l26 --kvm "$KVM" \
-        --cores 1 --memory 1024 --net0 "virtio,bridge=$PONTE" \
+        --cores 1 --memory 1024 --net0 "virtio,bridge=$PONTE,tag=$VLAN" \
         --scsihw virtio-scsi-single --scsi0 "$ALMACEN:0,import-from=$TMP/$IMAXE,discard=on" \
         --ide2 "$ALMACEN:cloudinit" --boot order=scsi0 \
         --serial0 socket --vga serial0 --agent enabled=1 \
@@ -86,7 +88,7 @@ NOME="iaas-$CLIENTE-$VMID"
 # --- 3. Clon e tamaño ---
 info "Creando $NOME (tamaño ${TAMANO^^}: $CPU vCPU, $((RAM / 1024)) GB, $DISCO GB) en $NODO"
 qm clone "$PLANTILLA" "$VMID" --name "$NOME" >/dev/null
-qm set "$VMID" --cores "$CPU" --memory "$RAM" --kvm "$KVM" \
+qm set "$VMID" --cores "$CPU" --memory "$RAM" --kvm "$KVM" --net0 "virtio,bridge=$PONTE,tag=$VLAN" \
     --ipconfig0 "ip=$IP/24,gw=$PASARELA" --nameserver "$DNS" --searchdomain "$DOMINIO" \
     --ciuser cliente --sshkeys "$FCLAVE" \
     --tags "iaas;cliente-$CLIENTE;tamano-${TAMANO,,}" \
@@ -98,6 +100,6 @@ cat <<FIN
 
 ==> Servidor $NOME (ID $VMID) arrancando en $NODO.
     Acceso do cliente:  ssh cliente@$IP   (nun ou dous minutos, cando remate cloud-init)
-    Ver na web:         https://$PASARELA:8006  ->  $VMID ($NOME)
+    Ver na web:         https://$(hostname -I | awk '{print $1}'):8006  ->  $VMID ($NOME)
     Borralo:            qm stop $VMID && qm destroy $VMID --purge
 FIN

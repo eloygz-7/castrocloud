@@ -26,3 +26,6 @@ proxmox_api_token = "terraform@pve!provider=00000000-0000-0000-0000-000000000000
 #   ct-servizos  = { nodo = "pve3", vm_id = 213, ip = "192.168.43.233", ram = 256, disco = 2, nucleos = 1 }
 #   ct-zabbix    = { nodo = "pve3", vm_id = 214, ip = "192.168.43.234", ram = 1024, disco = 4, nucleos = 1 }
 # }
+
+# Despois de instalar OPNsense no disco (opnsense/LEEME.md), quitar o DVD:
+# opnsense_instalado = true
