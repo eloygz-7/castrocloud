@@ -21,3 +21,7 @@ id_*
 *.qcow2
 *.vdi
 *.img
+
+# Ansible: inventario xerado por Terraform e contrasinais xerados
+ansible/inventario.ini
+ansible/segredos/

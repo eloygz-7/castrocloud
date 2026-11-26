@@ -1,0 +1,58 @@
+# Xerado por Ansible · ct-web: WordPress (PHP-FPM), Nginx e MySQL
+name: wordpress
+
+x-bd: &bd
+  WORDPRESS_DB_HOST: db
+  WORDPRESS_DB_NAME: wordpress
+  WORDPRESS_DB_USER: wordpress
+  WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+
+services:
+  db:
+    image: {{ imaxe_mysql }}
+    restart: unless-stopped
+    command: {{ mysql_axustes }}
+    environment:
+      TZ: {{ zona_horaria }}
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql:/var/lib/mysql
+
+  app:
+    image: {{ imaxe_wordpress }}
+    restart: unless-stopped
+    depends_on: [db]
+    environment:
+      <<: *bd
+      TZ: {{ zona_horaria }}
+    volumes:
+      - wordpress:/var/www/html
+
+  web:
+    image: {{ imaxe_nginx }}
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - wordpress:/var/www/html:ro
+
+  # WP-CLI: non queda acendido, só se usa con «docker compose run --rm cli wp ...».
+  # Mesmo usuario (www-data, 33) que a imaxe de PHP-FPM para non romper permisos.
+  cli:
+    image: {{ imaxe_wpcli }}
+    profiles: [cli]
+    user: "33:33"
+    depends_on: [db]
+    environment:
+      <<: *bd
+    volumes:
+      - wordpress:/var/www/html
+
+volumes:
+  mysql:
+  wordpress:

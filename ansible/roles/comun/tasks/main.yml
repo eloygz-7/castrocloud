@@ -1,0 +1,70 @@
+# Base común: zona horaria, paquetes, Docker e axente de Zabbix
+
+- name: Zona horaria
+  community.general.timezone:
+    name: "{{ zona_horaria }}"
+
+- name: Paquetes básicos
+  ansible.builtin.apt:
+    name: [ca-certificates, curl, gnupg, python3-apt]
+    update_cache: true
+    cache_valid_time: 3600
+
+# Docker desde o repositorio oficial de Docker (inclúe o complemento «docker compose»)
+- name: Repositorio oficial de Docker
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: deb
+    uris: https://download.docker.com/linux/debian
+    suites: "{{ ansible_facts.distribution_release }}"
+    components: stable
+    signed_by: https://download.docker.com/linux/debian/gpg
+
+- name: Instalar Docker e Docker Compose
+  ansible.builtin.apt:
+    name: [docker-ce, docker-ce-cli, containerd.io, docker-compose-plugin]
+    update_cache: true
+
+- name: Docker arranca co servidor
+  ansible.builtin.systemd_service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Directorio dos servizos
+  ansible.builtin.file:
+    path: "{{ directorio_servizos }}"
+    state: directory
+    mode: "0750"
+
+# Axente de Zabbix 2: rexístrase só no servidor Zabbix (HostMetadata) e
+# vixía tamén os contedores de Docker do servidor
+- name: Instalar o axente de Zabbix
+  ansible.builtin.apt:
+    name: zabbix-agent2
+
+- name: Configurar o axente de Zabbix
+  ansible.builtin.lineinfile:
+    path: /etc/zabbix/zabbix_agent2.conf
+    regexp: "^#? ?{{ item.clave }}="
+    line: "{{ item.clave }}={{ item.valor }}"
+  loop:
+    # 172.16.0.0/12: o servidor Zabbix corre en Docker no seu propio servidor
+    - { clave: Server, valor: "{{ ip_zabbix }},172.16.0.0/12" }
+    - { clave: ServerActive, valor: "{{ ip_zabbix }}" }
+    - { clave: Hostname, valor: "{{ inventory_hostname }}" }
+    - { clave: HostMetadata, valor: castrocloud }
+  notify: Reiniciar o axente de Zabbix
+
+- name: O axente pode ler o estado de Docker
+  ansible.builtin.user:
+    name: zabbix
+    groups: docker
+    append: true
+  notify: Reiniciar o axente de Zabbix
+
+- name: O axente arranca co servidor
+  ansible.builtin.systemd_service:
+    name: zabbix-agent2
+    state: started
+    enabled: true

@@ -1,0 +1,54 @@
+# Xerado por Ansible · ct-zabbix: servidor Zabbix, web e MySQL
+name: zabbix
+
+x-bd: &bd
+  DB_SERVER_HOST: db
+  MYSQL_DATABASE: zabbix
+  MYSQL_USER: zabbix
+  MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+
+services:
+  # Zabbix precisa utf8mb4_bin; log-bin-trust permite crear o seu esquema
+  db:
+    image: {{ imaxe_mysql }}
+    restart: unless-stopped
+    command: >-
+      {{ mysql_axustes }}
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_bin
+      --log-bin-trust-function-creators=1
+    environment:
+      TZ: {{ zona_horaria }}
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER: zabbix
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql:/var/lib/mysql
+
+  # Servidor: recibe os datos dos axentes (porto 10051)
+  server:
+    image: {{ imaxe_zabbix_server }}
+    restart: unless-stopped
+    depends_on: [db]
+    ports:
+      - "10051:10051"
+    environment:
+      <<: *bd
+      TZ: {{ zona_horaria }}
+      ZBX_CACHESIZE: 32M
+
+  # Web de Zabbix (Nginx e PHP-FPM) no porto 80
+  web:
+    image: {{ imaxe_zabbix_web }}
+    restart: unless-stopped
+    depends_on: [server]
+    ports:
+      - "80:8080"
+    environment:
+      <<: *bd
+      ZBX_SERVER_HOST: server
+      PHP_TZ: {{ zona_horaria }}
+
+volumes:
+  mysql:

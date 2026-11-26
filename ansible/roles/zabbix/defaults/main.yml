@@ -1,0 +1,6 @@
+zabbix_api: http://{{ ip_zabbix }}/api_jsonrpc.php
+zabbix_grupo: Linux servers
+zabbix_accion: Rexistro automático CastroCloud
+zabbix_modelos:
+  - Linux by Zabbix agent active
+  - Docker by Zabbix agent 2

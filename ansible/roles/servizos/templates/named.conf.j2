@@ -1,0 +1,22 @@
+// Xerado por Ansible · Bind9 de CastroCloud
+options {
+    directory "/var/cache/bind";
+    listen-on { any; };
+    listen-on-v6 { none; };
+
+    // Só resolve para a rede interna: non é un DNS aberto a Internet
+    recursion yes;
+    allow-recursion { 127.0.0.1; {{ rede_local }}; 172.16.0.0/12; };
+    allow-transfer { none; };
+    forwarders { {% for d in dns_externos %}{{ d }}; {% endfor %}};
+    forward only;
+    // Os reenviadores (Cloudflare e Quad9) xa validan DNSSEC. Validar tamén
+    // aquí falla na demo: as respostas grandes das claves da raíz pérdense
+    // polo dobre NAT da wifi.
+    dnssec-validation no;
+};
+
+zone "{{ dominio }}" {
+    type primary;
+    file "/etc/bind/db.{{ dominio }}";
+};

@@ -1,0 +1,52 @@
+# CastroCloud · Variables comúns a todos os servidores
+
+dominio: castrocloud.lan
+base_dn: dc=castrocloud,dc=lan
+zona_horaria: Europe/Madrid
+directorio_servizos: /opt/castrocloud
+
+# Rede da demo (a wifi). Se cambia, cambiar tamén en terraform.tfvars.
+rede_local: 192.168.0.0/24
+dns_externos: [1.1.1.1, 9.9.9.9]
+nodos_proxmox:
+  pve1: 192.168.0.211
+  pve2: 192.168.0.212
+  pve3: 192.168.0.213
+
+# IP de cada servidor, sacadas do inventario que xera Terraform
+ip_servizos: "{{ hostvars['ct-servizos'].ansible_host }}"
+ip_nextcloud: "{{ hostvars['ct-nextcloud'].ansible_host }}"
+ip_web: "{{ hostvars['ct-web'].ansible_host }}"
+ip_zabbix: "{{ hostvars['ct-zabbix'].ansible_host }}"
+
+# Versións das imaxes de Docker (fixas para que a demo sexa reproducible)
+imaxe_mysql: mysql:8.4
+imaxe_nginx: nginx:stable-alpine
+imaxe_lldap: lldap/lldap:stable
+imaxe_bind9: internetsystemsconsortium/bind9:9.20
+imaxe_nextcloud: nextcloud:32-fpm
+imaxe_wordpress: wordpress:php8.3-fpm
+imaxe_wpcli: wordpress:cli-php8.3
+imaxe_zabbix_server: zabbix/zabbix-server-mysql:alpine-7.0-latest
+imaxe_zabbix_web: zabbix/zabbix-web-nginx-mysql:alpine-7.0-latest
+
+# MySQL con pouca memoria: os servidores da demo teñen entre 512 MB e 1,5 GB
+mysql_axustes: >-
+  --innodb-buffer-pool-size=128M
+  --performance-schema=OFF
+  --max-connections=50
+
+# Contrasinais: xéranse a primeira vez e gárdanse en segredos/ (fóra de git)
+segredos: "{{ inventory_dir }}/segredos"
+contrasinal_lldap_admin: "{{ lookup('ansible.builtin.password', segredos ~ '/lldap_admin', length=24, chars=['ascii_letters', 'digits']) }}"
+lldap_jwt: "{{ lookup('ansible.builtin.password', segredos ~ '/lldap_jwt', length=48, chars=['ascii_letters', 'digits']) }}"
+lldap_semente: "{{ lookup('ansible.builtin.password', segredos ~ '/lldap_semente', length=48, chars=['ascii_letters', 'digits']) }}"
+contrasinal_nextcloud_admin: "{{ lookup('ansible.builtin.password', segredos ~ '/nextcloud_admin', length=24, chars=['ascii_letters', 'digits']) }}"
+contrasinal_nextcloud_bd: "{{ lookup('ansible.builtin.password', segredos ~ '/nextcloud_bd', length=24, chars=['ascii_letters', 'digits']) }}"
+contrasinal_nextcloud_bd_root: "{{ lookup('ansible.builtin.password', segredos ~ '/nextcloud_bd_root', length=24, chars=['ascii_letters', 'digits']) }}"
+contrasinal_wordpress_admin: "{{ lookup('ansible.builtin.password', segredos ~ '/wordpress_admin', length=24, chars=['ascii_letters', 'digits']) }}"
+contrasinal_wordpress_bd: "{{ lookup('ansible.builtin.password', segredos ~ '/wordpress_bd', length=24, chars=['ascii_letters', 'digits']) }}"
+contrasinal_wordpress_bd_root: "{{ lookup('ansible.builtin.password', segredos ~ '/wordpress_bd_root', length=24, chars=['ascii_letters', 'digits']) }}"
+contrasinal_zabbix_admin: "{{ lookup('ansible.builtin.password', segredos ~ '/zabbix_admin', length=24, chars=['ascii_letters', 'digits']) }}"
+contrasinal_zabbix_bd: "{{ lookup('ansible.builtin.password', segredos ~ '/zabbix_bd', length=24, chars=['ascii_letters', 'digits']) }}"
+contrasinal_zabbix_bd_root: "{{ lookup('ansible.builtin.password', segredos ~ '/zabbix_bd_root', length=24, chars=['ascii_letters', 'digits']) }}"

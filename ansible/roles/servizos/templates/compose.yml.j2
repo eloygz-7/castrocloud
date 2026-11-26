@@ -1,0 +1,37 @@
+# Xerado por Ansible · ct-servizos: lldap e Bind9
+name: servizos
+
+services:
+  # Directorio de usuarios: LDAP no porto 3890 e web de administración no 17170
+  lldap:
+    image: {{ imaxe_lldap }}
+    restart: unless-stopped
+    ports:
+      - "3890:3890"
+      - "17170:17170"
+    environment:
+      TZ: {{ zona_horaria }}
+      LLDAP_LDAP_BASE_DN: {{ base_dn }}
+      LLDAP_JWT_SECRET: ${LLDAP_JWT_SECRET}
+      LLDAP_KEY_SEED: ${LLDAP_KEY_SEED}
+      LLDAP_LDAP_USER_PASS: ${LLDAP_LDAP_USER_PASS}
+    volumes:
+      - lldap:/data
+
+  # DNS interno: resolve {{ dominio }} e reenvía o resto a DNS públicos
+  bind9:
+    image: {{ imaxe_bind9 }}
+    restart: unless-stopped
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+    environment:
+      TZ: {{ zona_horaria }}
+    volumes:
+      - ./bind/named.conf:/etc/bind/named.conf:ro
+      - ./bind/db.{{ dominio }}:/etc/bind/db.{{ dominio }}:ro
+      - bind-cache:/var/cache/bind
+
+volumes:
+  lldap:
+  bind-cache:

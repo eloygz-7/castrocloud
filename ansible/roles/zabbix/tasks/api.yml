@@ -1,0 +1,88 @@
+# Configuración inicial de Zabbix coa súa API JSON-RPC
+
+- name: Agardar a que a API de Zabbix responda
+  ansible.builtin.uri:
+    url: "{{ zabbix_api }}"
+    method: POST
+    body_format: json
+    body: { jsonrpc: "2.0", method: apiinfo.version, params: {}, id: 1 }
+  register: api
+  until: api.status == 200 and api.json.result is defined
+  retries: 40
+  delay: 15
+
+# A primeira vez o usuario Admin ten o contrasinal de fábrica («zabbix»): cámbiase
+- name: Probar o contrasinal de fábrica
+  ansible.builtin.uri:
+    url: "{{ zabbix_api }}"
+    method: POST
+    body_format: json
+    body: { jsonrpc: "2.0", method: user.login, params: { username: Admin, password: zabbix }, id: 1 }
+  register: de_fabrica
+
+- name: Cambiar o contrasinal de Admin
+  ansible.builtin.uri:
+    url: "{{ zabbix_api }}"
+    method: POST
+    body_format: json
+    headers: { Authorization: "Bearer {{ de_fabrica.json.result }}" }
+    body:
+      jsonrpc: "2.0"
+      method: user.update
+      params: { userid: "1", current_passwd: zabbix, passwd: "{{ contrasinal_zabbix_admin }}" }
+      id: 1
+  when: de_fabrica.json.result is defined
+  changed_when: true
+  no_log: true
+
+- name: Entrar co contrasinal novo
+  ansible.builtin.uri:
+    url: "{{ zabbix_api }}"
+    method: POST
+    body_format: json
+    body: { jsonrpc: "2.0", method: user.login, params: { username: Admin, password: "{{ contrasinal_zabbix_admin }}" }, id: 1 }
+  register: sesion
+  failed_when: sesion.json.result is not defined
+  no_log: true
+
+- name: Buscar os modelos e o grupo para os servidores
+  ansible.builtin.uri:
+    url: "{{ zabbix_api }}"
+    method: POST
+    body_format: json
+    headers: { Authorization: "Bearer {{ sesion.json.result }}" }
+    body: { jsonrpc: "2.0", method: "{{ item.metodo }}", params: "{{ item.params }}", id: 1 }
+  loop:
+    - { metodo: template.get, params: { output: [templateid], filter: { host: "{{ zabbix_modelos }}" } } }
+    - { metodo: hostgroup.get, params: { output: [groupid], filter: { name: ["{{ zabbix_grupo }}"] } } }
+    - { metodo: action.get, params: { output: [actionid], filter: { name: "{{ zabbix_accion }}", eventsource: 2 } } }
+  loop_control:
+    label: "{{ item.metodo }}"
+  register: busca
+
+- name: Crear a acción de rexistro automático
+  ansible.builtin.uri:
+    url: "{{ zabbix_api }}"
+    method: POST
+    body_format: json
+    headers: { Authorization: "Bearer {{ sesion.json.result }}" }
+    body:
+      jsonrpc: "2.0"
+      method: action.create
+      params:
+        name: "{{ zabbix_accion }}"
+        eventsource: 2          # rexistro automático de axentes
+        status: 0
+        filter:
+          evaltype: 0
+          conditions:
+            - { conditiontype: 24, operator: 2, value: castrocloud }   # HostMetadata contén «castrocloud»
+        operations:
+          - { operationtype: 2 }                                       # engadir o servidor
+          - { operationtype: 4, opgroup: "{{ busca.results[1].json.result }}" }
+          - { operationtype: 6, optemplate: "{{ busca.results[0].json.result }}" }
+      id: 1
+  register: accion
+  when: busca.results[2].json.result | length == 0
+  failed_when: accion.json.error is defined
+  changed_when: true

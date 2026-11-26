@@ -1,0 +1,5 @@
+- name: Reiniciar Bind9
+  community.docker.docker_compose_v2:
+    project_src: "{{ directorio_servizos }}/servizos"
+    services: [bind9]
+    state: restarted

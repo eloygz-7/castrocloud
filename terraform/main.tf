@@ -1,13 +1,11 @@
-# Demostración: 8 contedores LXC lixeiros repartidos polo clúster
-# (3 en pve1, 2 en pve2, que é o PC con Windows e ten menos recursos, e 3 en pve3).
-# Os contedores LXC non necesitan virtualización aniñada, así que funcionan
-# tamén no nodo de Windows.
+# Servidores dos servizos: contedores LXC con Debian 13 nos que Ansible
+# instalará Docker e despregará Nextcloud, WordPress, lldap, Bind9 e Zabbix.
+# Van só en pve1 e pve3 (var.nodos_servizos): pve2 non ten recursos.
 
-# 1. Descargar a plantilla de Alpine Linux en cada nodo (3,5 MB fronte aos 130 MB de Debian:
-#    o PC con Windows (pve2) ten poucos recursos e baixa lento pola wifi).
+# 1. Descargar a plantilla de Debian en cada nodo de servizos.
 #    Descárgase unha vez por nodo, porque o almacenamento "local" é propio de cada nodo.
 resource "proxmox_download_file" "plantilla_lxc" {
-  for_each = local.nodos
+  for_each = local.servizos
 
   node_name          = each.key
   datastore_id       = "local"
@@ -15,7 +13,7 @@ resource "proxmox_download_file" "plantilla_lxc" {
   url                = var.plantilla_lxc.url
   checksum           = var.plantilla_lxc.sha512
   checksum_algorithm = "sha512"
-  # O nodo de Windows (pve2) baixa máis lento pola wifi: os 10 min por defecto non chegan
+  # A wifi pode ser lenta: os 10 min por defecto ás veces non chegan
   upload_timeout = 3600
 }
 
@@ -26,33 +24,35 @@ resource "random_password" "root" {
 }
 
 # 3. Os contedores
-resource "proxmox_virtual_environment_container" "demo" {
+resource "proxmox_virtual_environment_container" "servizo" {
   for_each = var.contedores
 
   node_name   = each.value.nodo
   vm_id       = each.value.vm_id
-  description = "CastroCloud: contedor de demostración creado con Terraform"
+  description = "CastroCloud: servidor de servizos creado con Terraform"
   tags        = ["castrocloud", "terraform"]
 
   unprivileged  = true
   start_on_boot = true
+  # Docker dentro dun contedor sen privilexios: abonda con nesting.
+  # (keyctl só o pode activar root@pam, non un token da API)
   features {
     nesting = true
   }
 
   cpu {
-    cores = 1
+    cores = each.value.nucleos
   }
 
   memory {
-    dedicated = 128
-    swap      = 0
+    dedicated = each.value.ram
+    swap      = 256
   }
 
   # O disco vai no ZFS (almacenamento.tf) para poder replicalo aos outros nodos
   disk {
     datastore_id = proxmox_storage_zfspool.datos.id
-    size         = 1
+    size         = each.value.disco
   }
 
   network_interface {
@@ -62,7 +62,7 @@ resource "proxmox_virtual_environment_container" "demo" {
 
   operating_system {
     template_file_id = proxmox_download_file.plantilla_lxc[each.value.nodo].id
-    type             = "alpine"
+    type             = "debian"
   }
 
   initialization {
@@ -71,7 +71,8 @@ resource "proxmox_virtual_environment_container" "demo" {
     ip_config {
       ipv4 {
         address = "${each.value.ip}/24"
-        gateway = var.pasarela
+        # O seu nodo fai de pasarela con NAT (pola wifi non chegan ao router)
+        gateway = var.ip_nodos[each.value.nodo]
       }
     }
 
@@ -81,6 +82,8 @@ resource "proxmox_virtual_environment_container" "demo" {
 
     user_account {
       password = random_password.root.result
+      # Ansible entra con esta clave (sen contrasinal) para configurar o servidor
+      keys = [trimspace(file(pathexpand(var.ssh_clave_publica)))]
     }
   }
 

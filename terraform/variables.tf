@@ -10,27 +10,54 @@ variable "proxmox_api_token" {
   sensitive   = true
 }
 
+variable "nodos_servizos" {
+  description = <<-EOT
+    Nodos que executan os servizos. pve2 (o PC con Windows) queda fóra por falta
+    de recursos: só achega o quórum do clúster e a copia secundaria do PBS.
+  EOT
+  type        = list(string)
+  default     = ["pve1", "pve3"]
+}
+
 variable "contedores" {
-  description = "Contedores de demostración: nome => nodo, ID e IP (3 en pve1, 2 en pve2 e 3 en pve3)"
+  description = "Servidores dos servizos: nome => nodo preferido, ID, IP, RAM (MB), disco (GB) e núcleos"
   type = map(object({
-    nodo  = string
-    vm_id = number
-    ip    = string
+    nodo    = string
+    vm_id   = number
+    ip      = string
+    ram     = number
+    disco   = number
+    nucleos = number
   }))
   default = {
-    ct-pve1-1 = { nodo = "pve1", vm_id = 201, ip = "192.168.0.221" }
-    ct-pve1-2 = { nodo = "pve1", vm_id = 202, ip = "192.168.0.222" }
-    ct-pve1-3 = { nodo = "pve1", vm_id = 203, ip = "192.168.0.223" }
-    ct-pve2-1 = { nodo = "pve2", vm_id = 204, ip = "192.168.0.224" }
-    ct-pve2-2 = { nodo = "pve2", vm_id = 205, ip = "192.168.0.225" }
-    ct-pve3-1 = { nodo = "pve3", vm_id = 206, ip = "192.168.0.226" }
-    ct-pve3-2 = { nodo = "pve3", vm_id = 207, ip = "192.168.0.227" }
-    ct-pve3-3 = { nodo = "pve3", vm_id = 208, ip = "192.168.0.228" }
+    ct-nextcloud = { nodo = "pve1", vm_id = 211, ip = "192.168.0.231", ram = 1536, disco = 10, nucleos = 2 } # Nextcloud e o seu MySQL
+    ct-web       = { nodo = "pve3", vm_id = 212, ip = "192.168.0.232", ram = 512, disco = 4, nucleos = 1 }   # WordPress con Nginx e MySQL
+    ct-servizos  = { nodo = "pve3", vm_id = 213, ip = "192.168.0.233", ram = 512, disco = 2, nucleos = 1 }   # lldap e Bind9
+    ct-zabbix    = { nodo = "pve3", vm_id = 214, ip = "192.168.0.234", ram = 1024, disco = 4, nucleos = 1 }  # Zabbix e o seu MySQL
+  }
+}
+
+variable "ssh_clave_publica" {
+  description = "Clave pública SSH coa que Ansible entra como root nos servidores (crear con: ssh-keygen -t ed25519)"
+  type        = string
+  default     = "~/.ssh/id_ed25519.pub"
+}
+
+variable "ip_nodos" {
+  description = <<-EOT
+    IP de cada nodo. Cada servidor usa o seu nodo preferido como pasarela (NAT,
+    ver scripts/configurar-nat.sh): pola wifi os contedores non chegan ao router.
+  EOT
+  type        = map(string)
+  default = {
+    pve1 = "192.168.0.211"
+    pve2 = "192.168.0.212"
+    pve3 = "192.168.0.213"
   }
 }
 
 variable "pasarela" {
-  description = "Pasarela da wifi (o router)"
+  description = "Pasarela da wifi (o router); non a usan os servidores dos servizos (ver ip_nodos)"
   type        = string
   default     = "192.168.0.1"
 }
@@ -48,7 +75,7 @@ variable "disco_zfs" {
 }
 
 variable "replicacion_cada" {
-  description = "Cada canto se replican os contedores aos outros nodos (formato de calendario de systemd)"
+  description = "Cada canto se replican os contedores ao outro nodo de servizos (formato de calendario de systemd)"
   type        = string
   default     = "*/5"
 }
@@ -96,13 +123,13 @@ variable "copia_hora" {
 }
 
 variable "plantilla_lxc" {
-  description = "Plantilla oficial de Proxmox para os contedores LXC (Alpine Linux 3.24, lixeira para o nodo de Windows)"
+  description = "Plantilla oficial de Proxmox para os contedores LXC (Debian 13: Docker e Ansible funcionan sen axustes)"
   type = object({
     url    = string
     sha512 = string
   })
   default = {
-    url    = "http://download.proxmox.com/images/system/alpine-3.24-default_20261105_amd64.tar.xz"
-    sha512 = "5f2ab800b1cf9b9eed768b0cd4b4c395d5bc00a7eda7a185c89111067a25e7ce28d86ffb6d1b3f3181d43d9935e708c713f6b3937f39a5f2839cb56214889c8b"
+    url    = "http://download.proxmox.com/images/system/debian-13-standard_13.6-1_amd64.tar.zst"
+    sha512 = "4c0c27ca6ceab5ef0b84db57825a00f26157ef1854bafe97297813e1cbe8ecb8cc9c453cab6b3b0efe1ba193a50c47ece1e41d950e411b8730b835b71e9e754b"
   }
 }

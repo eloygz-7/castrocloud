@@ -1,0 +1,5 @@
+- name: Reiniciar Nginx de WordPress
+  community.docker.docker_compose_v2:
+    project_src: "{{ directorio_servizos }}/wordpress"
+    services: [web]
+    state: restarted

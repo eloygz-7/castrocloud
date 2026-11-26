@@ -1,0 +1,100 @@
+# ct-nextcloud: Nextcloud (PHP-FPM) + Nginx + MySQL, cos usuarios de lldap
+
+- name: Directorio de Nextcloud
+  ansible.builtin.file:
+    path: "{{ directorio_servizos }}/nextcloud"
+    state: directory
+    mode: "0750"
+
+- name: Segredos de Nextcloud (.env, só para root)
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ directorio_servizos }}/nextcloud/.env"
+    mode: "0600"
+
+- name: Configuración de Nginx para Nextcloud
+  ansible.builtin.copy:
+    src: nginx.conf
+    dest: "{{ directorio_servizos }}/nextcloud/nginx.conf"
+    mode: "0644"
+  notify: Reiniciar Nginx de Nextcloud
+
+- name: Docker Compose de Nextcloud
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ directorio_servizos }}/nextcloud/compose.yml"
+    mode: "0644"
+
+- name: Arrancar Nextcloud
+  community.docker.docker_compose_v2:
+    project_src: "{{ directorio_servizos }}/nextcloud"
+    pull: missing
+
+# A primeira vez a imaxe instala Nextcloud ela soa (tarda uns minutos)
+- name: Agardar a que Nextcloud remate de instalarse
+  ansible.builtin.command: docker compose exec -T -u www-data app php occ status --output=json
+  args:
+    chdir: "{{ directorio_servizos }}/nextcloud"
+  register: estado
+  until: estado.rc == 0 and (estado.stdout | from_json).installed
+  retries: 40
+  delay: 15
+  changed_when: false
+
+- name: Axustes de Nextcloud
+  ansible.builtin.command: docker compose exec -T -u www-data app php occ {{ item }}
+  args:
+    chdir: "{{ directorio_servizos }}/nextcloud"
+  loop:
+    # A imaxe só garda o primeiro dominio de NEXTCLOUD_TRUSTED_DOMAINS: fíxanse aquí
+    - config:system:set trusted_domains 1 --value={{ ip_nextcloud }}
+    - config:system:set trusted_domains 2 --value=nextcloud.{{ dominio }}
+    - config:system:set default_phone_region --value=ES
+    - config:system:set default_language --value=gl
+    - config:system:set maintenance_window_start --type=integer --value=1
+    - background:cron
+    - app:enable user_ldap
+  changed_when: false
+
+# Conexión con lldap: os usuarios dados de alta en lldap entran en Nextcloud
+- name: Ver se xa existe a configuración LDAP
+  ansible.builtin.command: docker compose exec -T -u www-data app php occ ldap:show-config s01
+  args:
+    chdir: "{{ directorio_servizos }}/nextcloud"
+  register: ldap_existe
+  failed_when: false
+  changed_when: false
+
+- name: Crear a configuración LDAP baleira
+  ansible.builtin.command: docker compose exec -T -u www-data app php occ ldap:create-empty-config
+  args:
+    chdir: "{{ directorio_servizos }}/nextcloud"
+  when: ldap_existe.rc != 0
+
+- name: Configurar a conexión con lldap
+  ansible.builtin.command:
+    argv: [docker, compose, exec, -T, -u, www-data, app, php, occ, "ldap:set-config", s01, "{{ item.clave }}", "{{ item.valor }}"]
+    chdir: "{{ directorio_servizos }}/nextcloud"
+  loop:
+    - { clave: ldapHost, valor: "ldap://{{ ip_servizos }}" }
+    - { clave: ldapPort, valor: "3890" }
+    # Demo: conéctase co administrador de lldap. En produción, un usuario só de lectura.
+    - { clave: ldapAgentName, valor: "uid=admin,ou=people,{{ base_dn }}" }
+    - { clave: ldapAgentPassword, valor: "{{ contrasinal_lldap_admin }}" }
+    - { clave: ldapBase, valor: "{{ base_dn }}" }
+    - { clave: ldapBaseUsers, valor: "ou=people,{{ base_dn }}" }
+    - { clave: ldapBaseGroups, valor: "ou=groups,{{ base_dn }}" }
+    - { clave: ldapUserFilterObjectclass, valor: person }
+    - { clave: ldapUserFilter, valor: "(objectclass=person)" }
+    - { clave: ldapLoginFilter, valor: "(&(objectclass=person)(|(uid=%uid)(mail=%uid)))" }
+    - { clave: ldapGroupFilterObjectclass, valor: groupOfUniqueNames }
+    - { clave: ldapGroupFilter, valor: "(objectclass=groupOfUniqueNames)" }
+    - { clave: ldapGroupMemberAssocAttr, valor: uniqueMember }
+    - { clave: ldapUserDisplayName, valor: cn }
+    - { clave: ldapEmailAttribute, valor: mail }
+    - { clave: ldapExpertUsernameAttr, valor: uid }
+    - { clave: ldapConfigurationActive, valor: "1" }
+  loop_control:
+    label: "{{ item.clave }}"
+  no_log: "{{ item.clave == 'ldapAgentPassword' }}"
+  changed_when: false

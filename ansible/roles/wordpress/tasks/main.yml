@@ -1,0 +1,89 @@
+# ct-web: WordPress (PHP-FPM) + Nginx + MySQL. É a web de CastroCloud e o blog do proxecto.
+
+- name: Directorio de WordPress
+  ansible.builtin.file:
+    path: "{{ directorio_servizos }}/wordpress"
+    state: directory
+    mode: "0750"
+
+- name: Segredos de WordPress (.env, só para root)
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ directorio_servizos }}/wordpress/.env"
+    mode: "0600"
+
+- name: Configuración de Nginx para WordPress
+  ansible.builtin.copy:
+    src: nginx.conf
+    dest: "{{ directorio_servizos }}/wordpress/nginx.conf"
+    mode: "0644"
+  notify: Reiniciar Nginx de WordPress
+
+- name: Docker Compose de WordPress
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ directorio_servizos }}/wordpress/compose.yml"
+    mode: "0644"
+
+- name: Arrancar WordPress
+  community.docker.docker_compose_v2:
+    project_src: "{{ directorio_servizos }}/wordpress"
+    pull: missing
+
+# A imaxe crea wp-config.php ao arrancar a primeira vez
+- name: Agardar a que exista wp-config.php
+  ansible.builtin.command: docker compose exec -T app test -f /var/www/html/wp-config.php
+  args:
+    chdir: "{{ directorio_servizos }}/wordpress"
+  register: config
+  until: config.rc == 0
+  retries: 20
+  delay: 5
+  changed_when: false
+
+# Instalación con WP-CLI (contedor «cli», que só se lanza para isto)
+- name: Ver se WordPress xa está instalado
+  ansible.builtin.command: docker compose run --rm cli wp core is-installed
+  args:
+    chdir: "{{ directorio_servizos }}/wordpress"
+  register: instalado
+  until: instalado.rc in [0, 1]
+  retries: 12
+  delay: 5
+  failed_when: instalado.rc not in [0, 1]
+  changed_when: false
+
+- name: Instalar WordPress
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - run
+      - --rm
+      - cli
+      - wp
+      - core
+      - install
+      - "--url=http://{{ ip_web }}"
+      - "--title=CastroCloud"
+      - --admin_user=admin
+      - "--admin_password={{ contrasinal_wordpress_admin }}"
+      - "--admin_email=admin@{{ dominio }}"
+      - --skip-email
+    chdir: "{{ directorio_servizos }}/wordpress"
+  when: instalado.rc != 0
+  register: instalacion
+  until: instalacion.rc == 0   # MySQL tarda un pouco en aceptar conexións a primeira vez
+  retries: 10
+  delay: 10
+  no_log: true
+
+- name: Web en galego e enlaces permanentes lexibles
+  ansible.builtin.command: docker compose run --rm cli wp {{ item }}
+  args:
+    chdir: "{{ directorio_servizos }}/wordpress"
+  loop:
+    - language core install gl_ES --activate
+    - rewrite structure /%postname%/
+    - option update timezone_string {{ zona_horaria }}
+  when: instalado.rc != 0

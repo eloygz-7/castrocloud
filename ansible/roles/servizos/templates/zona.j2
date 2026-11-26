@@ -1,0 +1,23 @@
+; Xerado por Ansible · zona {{ dominio }}
+$TTL 3600
+@   IN  SOA ns.{{ dominio }}. admin.{{ dominio }}. (
+        {{ ansible_facts.date_time.date | replace('-', '') }}01 ; serie (data de hoxe)
+        3600       ; refresco
+        900        ; reintento
+        604800     ; caducidade
+        300 )      ; TTL negativo
+    IN  NS  ns.{{ dominio }}.
+
+; Servidores dos servizos
+ns          IN  A   {{ ip_servizos }}
+servizos    IN  A   {{ ip_servizos }}
+ldap        IN  A   {{ ip_servizos }}
+nextcloud   IN  A   {{ ip_nextcloud }}
+web         IN  A   {{ ip_web }}
+blog        IN  CNAME   web
+zabbix      IN  A   {{ ip_zabbix }}
+
+; Nodos do clúster Proxmox
+{% for nome, ip in nodos_proxmox.items() %}
+{{ '%-11s' | format(nome) }} IN  A   {{ ip }}
+{% endfor %}

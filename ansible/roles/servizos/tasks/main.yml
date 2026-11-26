@@ -1,0 +1,35 @@
+# ct-servizos: lldap (directorio de usuarios LDAP, cunha web sinxela para
+# xestionalos) e Bind9 (DNS interno da zona castrocloud.lan)
+
+- name: Directorios de lldap e Bind9
+  ansible.builtin.file:
+    path: "{{ directorio_servizos }}/servizos/bind"
+    state: directory
+    mode: "0755"
+
+- name: Segredos de lldap (.env, só para root)
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ directorio_servizos }}/servizos/.env"
+    mode: "0600"
+
+- name: Configuración de Bind9
+  ansible.builtin.template:
+    src: "{{ item.orixe }}"
+    dest: "{{ directorio_servizos }}/servizos/bind/{{ item.destino }}"
+    mode: "0644"
+  loop:
+    - { orixe: named.conf.j2, destino: named.conf }
+    - { orixe: zona.j2, destino: "db.{{ dominio }}" }
+  notify: Reiniciar Bind9
+
+- name: Docker Compose dos servizos
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ directorio_servizos }}/servizos/compose.yml"
+    mode: "0644"
+
+- name: Arrancar lldap e Bind9
+  community.docker.docker_compose_v2:
+    project_src: "{{ directorio_servizos }}/servizos"
+    pull: missing

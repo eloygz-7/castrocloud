@@ -1,0 +1,44 @@
+# CastroCloud · Playbook principal: deixa listos os catro servidores dos servizos.
+#
+# Terraform crea os servidores (contedores LXC con Debian 13) e Ansible
+# configúraos por dentro: Docker, o axente de Zabbix e cada servizo en Docker Compose.
+#
+# Uso, desde codigo/ansible no equipo de Eloy:
+#   terraform -chdir=../terraform output -raw inventario_ansible > inventario.ini
+#   ansible-galaxy collection install -r requisitos.yml
+#   ansible-playbook sitio.yml
+#
+# Pódese repetir cantas veces se queira: só cambia o que non estea xa ben.
+# Os contrasinais xéranse sós a primeira vez en segredos/ (non se sube a git).
+
+- name: Base común en todos os servidores
+  hosts: servidores
+  gather_facts: false
+  pre_tasks:
+    - name: Instalar Python, que Ansible precisa nos servidores
+      ansible.builtin.raw: test -e /usr/bin/python3 || (apt-get update && apt-get install -y python3)
+      changed_when: false
+    - name: Recoller os datos dos servidores
+      ansible.builtin.setup:
+  roles:
+    - comun
+
+- name: Directorio de usuarios (lldap) e DNS interno (Bind9)
+  hosts: ct-servizos
+  roles:
+    - servizos
+
+- name: Nextcloud con MySQL e usuarios do LDAP
+  hosts: ct-nextcloud
+  roles:
+    - nextcloud
+
+- name: WordPress con Nginx e MySQL (web e blog do proxecto)
+  hosts: ct-web
+  roles:
+    - wordpress
+
+- name: Zabbix con MySQL e rexistro automático dos servidores
+  hosts: ct-zabbix
+  roles:
+    - zabbix

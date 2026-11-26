@@ -1,7 +1,9 @@
-# CastroCloud · Crea en Windows unha MV de VirtualBox lista para instalar Proxmox VE (nodo pve2).
+# CastroCloud · Crea en Windows unha MV de VirtualBox lista para instalar Proxmox VE.
 #
 # Uso (PowerShell, desde este cartafol):
 #   powershell -ExecutionPolicy Bypass -File .\crear-nodo-proxmox.ps1 -Iso C:\ISOs\proxmox-ve_9.2-1.iso -Adaptador "Wi-Fi"
+#   (por defecto crea pve2; para un clúster enteiro nun só equipo, con pouca RAM e disco:)
+#   ... -Nome pve1 -RamMB 3072 -DiscoGB 16 -DatosGB 6 -CopiasMB 1024
 #
 # -Adaptador: nome da tarxeta wifi (ou de cable) tal e como o mostra
 #   & "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" list bridgedifs   (liña "Name:")

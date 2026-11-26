@@ -3,7 +3,10 @@
 # Proxmox poida replicar os contedores dun nodo a outro.
 
 locals {
-  nodos = toset([for ct in var.contedores : ct.nodo])
+  # O pool créase nos tres nodos (o de pve2 xa existe e non se toca), pero os
+  # servizos só corren e se replican en local.servizos (pve1 e pve3).
+  nodos    = toset(["pve1", "pve2", "pve3"])
+  servizos = toset(var.nodos_servizos)
 }
 
 # 1. O pool ZFS en cada nodo (o disco ten que estar baleiro)
