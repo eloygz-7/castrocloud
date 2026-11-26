@@ -42,3 +42,13 @@
   hosts: ct-zabbix
   roles:
     - zabbix
+
+- name: Copia diaria das bases de datos MySQL
+  hosts: ct-nextcloud:ct-web:ct-zabbix
+  roles:
+    - copias_mysql
+
+- name: Informe diario en Python cos datos de Zabbix
+  hosts: ct-zabbix
+  roles:
+    - informe

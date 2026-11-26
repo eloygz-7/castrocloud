@@ -4,3 +4,4 @@ zabbix_accion: Rexistro automático CastroCloud
 zabbix_modelos:
   - Linux by Zabbix agent active
   - Docker by Zabbix agent 2
+zabbix_carga_maxima: "6"

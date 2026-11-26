@@ -25,3 +25,9 @@ id_*
 # Ansible: inventario xerado por Terraform e contrasinais xerados
 ansible/inventario.ini
 ansible/segredos/
+
+# Contrasinais iniciais dos clientes (alta-cliente.sh)
+altas/
+
+# Python compilado
+__pycache__/

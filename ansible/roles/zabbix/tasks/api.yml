@@ -86,3 +86,45 @@
   when: busca.results[2].json.result | length == 0
   failed_when: accion.json.error is defined
   changed_when: true
+
+# O host «Zabbix server» que trae Zabbix de fábrica non ten axente (o servidor
+# corre en Docker e xa o vixía o axente de ct-zabbix): desactívase
+- name: Buscar o host «Zabbix server» de fábrica
+  ansible.builtin.uri:
+    url: "{{ zabbix_api }}"
+    method: POST
+    body_format: json
+    headers: { Authorization: "Bearer {{ sesion.json.result }}" }
+    body: { jsonrpc: "2.0", method: host.get, params: { output: [hostid, status], filter: { host: ["Zabbix server"] } }, id: 1 }
+  register: zabbix_server
+
+- name: Desactivar o host «Zabbix server»
+  ansible.builtin.uri:
+    url: "{{ zabbix_api }}"
+    method: POST
+    body_format: json
+    headers: { Authorization: "Bearer {{ sesion.json.result }}" }
+    body: { jsonrpc: "2.0", method: host.update, params: { hostid: "{{ zabbix_server.json.result[0].hostid }}", status: 1 }, id: 1 }
+  when: zabbix_server.json.result | length > 0 and zabbix_server.json.result[0].status == "0"
+  changed_when: true
+
+# Nos contedores LXC a carga media (load average) é a do nodo enteiro, non a
+# do contedor: o aviso de fábrica (1,5 por CPU) saltaría sempre. Súbese o límite.
+- name: Buscar a macro global do límite de carga
+  ansible.builtin.uri:
+    url: "{{ zabbix_api }}"
+    method: POST
+    body_format: json
+    headers: { Authorization: "Bearer {{ sesion.json.result }}" }
+    body: { jsonrpc: "2.0", method: usermacro.get, params: { globalmacro: true, output: [globalmacroid], filter: { macro: "{$LOAD_AVG_PER_CPU.MAX.WARN}" } }, id: 1 }
+  register: macro_carga
+
+- name: Límite de carga para contedores LXC
+  ansible.builtin.uri:
+    url: "{{ zabbix_api }}"
+    method: POST
+    body_format: json
+    headers: { Authorization: "Bearer {{ sesion.json.result }}" }
+    body: { jsonrpc: "2.0", method: usermacro.createglobal, params: { macro: "{$LOAD_AVG_PER_CPU.MAX.WARN}", value: "{{ zabbix_carga_maxima }}", description: "Contedores LXC: a carga é a do nodo" }, id: 1 }
+  when: macro_carga.json.result | length == 0
+  changed_when: true

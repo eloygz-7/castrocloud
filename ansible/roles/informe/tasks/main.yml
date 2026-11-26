@@ -1,0 +1,30 @@
+# Informe diario en Python cos datos de Zabbix (scripts/informe-zabbix.py) ás 07:00
+
+- name: Instalar o script do informe
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../scripts/informe-zabbix.py"
+    dest: /usr/local/bin/informe-zabbix.py
+    mode: "0755"
+
+- name: Directorio da configuración
+  ansible.builtin.file:
+    path: /etc/castrocloud
+    state: directory
+    mode: "0700"
+
+- name: Datos de acceso a Zabbix (só root)
+  ansible.builtin.template:
+    src: informe-zabbix.ini.j2
+    dest: /etc/castrocloud/informe-zabbix.ini
+    mode: "0600"
+
+- name: Programar o informe ás 07:00 e gardar só os dos últimos 30 días
+  ansible.builtin.cron:
+    name: CastroCloud informe diario
+    minute: "0"
+    hour: "7"
+    job: >-
+      /usr/local/bin/informe-zabbix.py >/dev/null &&
+      find {{ directorio_servizos }}/informes -name 'informe-*.html' -mtime +30 -delete
+    cron_file: castrocloud-informe
+    user: root

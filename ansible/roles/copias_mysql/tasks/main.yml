@@ -1,0 +1,17 @@
+# Copia diaria das bases de datos MySQL (scripts/copia-mysql.sh) ás 01:30,
+# antes da copia do PBS (02:00), que leva tamén estes ficheiros
+
+- name: Instalar o script de copia de MySQL
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../scripts/copia-mysql.sh"
+    dest: /usr/local/sbin/copia-mysql.sh
+    mode: "0750"
+
+- name: Programar a copia de MySQL ás 01:30
+  ansible.builtin.cron:
+    name: CastroCloud copia de MySQL
+    minute: "30"
+    hour: "1"
+    job: /usr/local/sbin/copia-mysql.sh >/dev/null 2>&1
+    cron_file: castrocloud-copia-mysql
+    user: root
