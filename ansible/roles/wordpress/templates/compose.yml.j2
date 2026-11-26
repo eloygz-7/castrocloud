@@ -28,6 +28,16 @@ services:
     environment:
       <<: *bd
       TZ: {{ zona_horaria }}
+      # Os enlaces da web usan o enderezo polo que se entra (IP interna ou
+      # IP pública por HTTPS); e non se poden editar plugins nin temas desde
+      # o panel, por se alguén entrase de fóra.
+      WORDPRESS_CONFIG_EXTRA: |
+        if (!empty($$_SERVER['HTTP_HOST'])) {
+          $$esquema = (!empty($$_SERVER['HTTPS']) && $$_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+          define('WP_HOME', $$esquema . '://' . $$_SERVER['HTTP_HOST']);
+          define('WP_SITEURL', WP_HOME);
+        }
+        define('DISALLOW_FILE_EDIT', true);
     volumes:
       - wordpress:/var/www/html
 
@@ -37,8 +47,10 @@ services:
     depends_on: [app]
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./tls:/etc/nginx/tls:ro
       - wordpress:/var/www/html:ro
 
   # WP-CLI: non queda acendido, só se usa con «docker compose run --rm cli wp ...».

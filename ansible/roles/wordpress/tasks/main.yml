@@ -19,6 +19,23 @@
     mode: "0644"
   notify: Reiniciar Nginx de WordPress
 
+# Certificado propio para o HTTPS (a web publícase pola IP, sen dominio,
+# así que Let's Encrypt non serve; o navegador avisa a primeira vez)
+- name: Directorio do certificado
+  ansible.builtin.file:
+    path: "{{ directorio_servizos }}/wordpress/tls"
+    state: directory
+    mode: "0700"
+
+- name: Certificado HTTPS propio
+  ansible.builtin.command:
+    argv: [openssl, req, -x509, -newkey, rsa:2048, -nodes, -days, "825",
+           -subj, "/CN=web.{{ dominio }}",
+           -keyout, "{{ directorio_servizos }}/wordpress/tls/web.key",
+           -out, "{{ directorio_servizos }}/wordpress/tls/web.crt"]
+    creates: "{{ directorio_servizos }}/wordpress/tls/web.crt"
+  notify: Reiniciar Nginx de WordPress
+
 - name: Docker Compose de WordPress
   ansible.builtin.template:
     src: compose.yml.j2

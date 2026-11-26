@@ -88,3 +88,15 @@ cd ../ansible && ansible-playbook sitio.yml          # DNS, LDAP, Zabbix, web...
 System → Configuration → Backups → Download. Gárdase en
 `ansible/segredos/opnsense-config.xml`, fóra de git, porque leva os
 contrasinais cifrados. Ademais, a MV entra na copia diaria do PBS.
+
+## 7. Publicar a web de WordPress (só ese porto)
+
+Para editar a web desde fóra (`scripts/publicar-web.sh`):
+
+1. En pve3, o porto público vai á WAN de OPNsense:
+   ```bash
+   ssh root@192.168.0.213 'DESTINO=10.99.0.2 PORTO_DESTINO=8443 bash -s' < scripts/publicar-web.sh
+   ```
+2. En OPNsense, Firewall → NAT → Port Forward: interface WAN, TCP, porto de
+   destino `8443`, redirixir a `10.10.10.12`, porto `443`. Crea a regra da WAN
+   que só deixa pasar ese tráfico a ct-web.
